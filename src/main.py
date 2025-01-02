@@ -1,7 +1,7 @@
-from gui.app import PaymentApp
+from gui.app import PaymentGUI
 
 if __name__ == "__main__":
     import tkinter as tk
     root = tk.Tk()
-    app = PaymentApp(root)
+    app = PaymentGUI(root)
     root.mainloop()
