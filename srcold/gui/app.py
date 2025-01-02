@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk, simpledialog
 from services.payment_service import PaymentService
 from services.client_service import ClientService
 from services.whatsapp_service import WhatsAppService
@@ -9,11 +9,11 @@ from utils.calculations import Calculations
 class PaymentProcessor:
     def process_payments(self):
         self.payment_list.config(state=tk.NORMAL)
-        self.payment_list.delete("1.0", tk.END)
+        self.payment_list.delete(*self.payment_list.get_children())
 
         payments = PaymentService.get_due_payments()
         if not payments:
-            self.payment_list.insert(tk.END, "Nenhum pagamento encontrado.\n")
+            self.payment_list.insert("", "end", values=("Nenhum pagamento encontrado.",))
         else:
             for payment in payments:
                 days_until_due = DateUtils.days_until(payment.due_date)
@@ -22,20 +22,20 @@ class PaymentProcessor:
                     continue
 
                 if days_until_due <= 3 and days_until_due > 0:
-                    message = f"Cliente: {client.name} - Parcela de R${payment.amount} vence em {days_until_due} dias.\n"
+                    message = f"Cliente: {client.name} - Parcela de R${payment.amount} vence em {days_until_due} dias."
                 elif days_until_due == 0:
-                    message = f"Cliente: {client.name} - Parcela de R${payment.amount} vence hoje.\n"
+                    message = f"Cliente: {client.name} - Parcela de R${payment.amount} vence hoje."
                 elif days_until_due < 0:
                     days_late = abs(days_until_due)
                     fine = Calculations.calculate_fine(payment.amount)
                     interest = Calculations.calculate_daily_interest(payment.amount, days_late)
                     corrected_value = payment.amount + fine + interest
                     message = (f"Cliente: {client.name} - Parcela atrasada há {days_late} dias. "
-                              f"Valor corrigido: R${corrected_value:.2f}.\n")
+                              f"Valor corrigido: R${corrected_value:.2f}.")
                 else:
                     continue
 
-                self.payment_list.insert(tk.END, message)
+                self.payment_list.insert("", "end", values=(payment.id, client.name, payment.amount, message))
 
                 WhatsAppService.send_message(client.phone, message.strip())
                 PaymentService.log_change(payment.id, f"Cobrança enviada: {message.strip()}")
@@ -43,77 +43,62 @@ class PaymentProcessor:
         self.payment_list.config(state=tk.DISABLED)
         messagebox.showinfo("Cobranças Processadas", "Todas as cobranças foram processadas com sucesso!")
 
+
 class PaymentGUI:
     def __init__(self, master):
         self.master = master
         self.master.title("Sistema de Cobranças")
+        self.master.resizable(False, False)
 
-        # Exibição de pagamentos
-        self.payment_list = tk.Text(self.master, height=15, width=50)
-        self.payment_list.pack()
+        # Título
+        title_label = tk.Label(self.master, text="Gestão de Pagamentos", font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=4, pady=10)
+
+        # Tabela de pagamentos
+        self.payment_list = ttk.Treeview(self.master, columns=("ID", "Cliente", "Valor", "Mensagem"), show="headings", height=15)
+        self.payment_list.heading("ID", text="ID")
+        self.payment_list.heading("Cliente", text="Cliente")
+        self.payment_list.heading("Valor", text="Valor")
+        self.payment_list.heading("Mensagem", text="Mensagem")
+        self.payment_list.grid(row=1, column=0, columnspan=4, padx=10, pady=10)
+
+        # Barra de rolagem
+        scrollbar = tk.Scrollbar(self.master, orient="vertical", command=self.payment_list.yview)
+        scrollbar.grid(row=1, column=4, sticky="ns", padx=5)
+        self.payment_list.config(yscrollcommand=scrollbar.set)
 
         # Botões
-        process_button = tk.Button(
-            self.master,
-            text="Processar Cobranças",
-            command=self.process_payments,
-            width=30,
-            height=2,
-            bg="lightblue",
-        )
-        process_button.pack()
+        button_frame = tk.Frame(self.master)
+        button_frame.grid(row=2, column=0, columnspan=4, pady=10)
 
-        mark_paid_button = tk.Button(
-            self.master,
-            text="Marcar como Quitado",
-            command=self.mark_payment_as_paid,
-            width=30,
-            height=2,
-            bg="lightgreen",
-        )
-        mark_paid_button.pack()
+        process_button = tk.Button(button_frame, text="Processar Cobranças", command=self.process_payments, width=20, height=2, bg="lightblue")
+        process_button.grid(row=0, column=0, padx=5, sticky="ew")
 
-        add_payment_button = tk.Button(
-            self.master,
-            text="Adicionar Pagamento",
-            command=self.add_payment,
-            width=30,
-            height=2,
-            bg="lightyellow",
-        )
-        add_payment_button.pack()
+        mark_paid_button = tk.Button(button_frame, text="Marcar como Quitado", command=self.mark_payment_as_paid, width=20, height=2, bg="lightgreen")
+        mark_paid_button.grid(row=0, column=1, padx=5, sticky="ew")
 
-        delete_payment_button = tk.Button(
-            self.master,
-            text="Deletar Pagamento",
-            command=self.delete_payment,
-            width=30,
-            height=2,
-            bg="salmon",
-        )
-        delete_payment_button.pack()
+        add_payment_button = tk.Button(button_frame, text="Adicionar Pagamento", command=self.add_payment, width=20, height=2, bg="lightyellow")
+        add_payment_button.grid(row=0, column=2, padx=5, sticky="ew")
 
-        fetch_button = tk.Button(
-            self.master,
-            text="Atualizar Lista de Pagamentos",
-            command=self.fetch_payments,
-            width=30,
-            height=2,
-            bg="lightgray",
-        )
-        fetch_button.pack()
+        delete_payment_button = tk.Button(button_frame, text="Deletar Pagamento", command=self.delete_payment, width=20, height=2, bg="salmon")
+        delete_payment_button.grid(row=0, column=3, padx=5, sticky="ew")
 
-        # Inicializa a lista de pagamentos
+        fetch_button = tk.Button(button_frame, text="Atualizar Lista de Pagamentos", command=self.fetch_payments, width=20, height=2, bg="lightgray")
+        fetch_button.grid(row=1, column=0, columnspan=4, pady=5, sticky="ew")
+
         self.fetch_payments()
 
     def fetch_payments(self):
         """Carrega a lista de pagamentos do banco de dados."""
-        self.payment_list.delete("1.0", tk.END)
+        for row in self.payment_list.get_children():
+            self.payment_list.delete(row)
         payments = PaymentService.fetch_all_payments()
         for payment in payments:
+            client = ClientService.get_client_by_id(payment['client_id'])
             self.payment_list.insert(
-                tk.END,
-                f"ID: {payment['id']} | Cliente: {payment['client_name']} | Valor: {payment['amount']} | Status: {'Quitado' if payment['paid'] else 'Pendente'} | Visível: {payment['visible']}\n",
+                "",
+                "end",
+                values=(payment['id'], client.name, payment['amount'], "Quitado" if payment['is_paid'] else "Pendente"),
             )
 
     def process_payments(self):
@@ -172,7 +157,8 @@ class PaymentGUI:
     def get_payment_id(self):
         """Obtém o ID do pagamento selecionado."""
         try:
-            payment_id = self.payment_list.get("1.0", tk.END).strip().split("ID: ")[1].split(" ")[0]
+            selected_item = self.payment_list.selection()[0]
+            payment_id = self.payment_list.item(selected_item, "values")[0]
             return int(payment_id)
         except (IndexError, ValueError):
             return None
