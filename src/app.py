@@ -1,7 +1,7 @@
 import os
 import json
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from tkcalendar import DateEntry
@@ -95,33 +95,6 @@ class PaymentApp:
 
             # Inserir os dados na tabela
             self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], payment['amount'], due_date, is_paid))
-            
-    def load_data_old(self):
-        """Carregar pagamentos na tabela"""
-        for row in self.table.get_children():
-            self.table.delete(row)
-
-        # Obter os dados dos clientes e pagamentos
-        payments = supabase.table("payments").select("*").execute()
-
-        for payment in payments.data:
-            # Obter os dados do cliente
-            client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
-            
-            # Ajustar o status de pagamento
-            is_paid = "Quitado" if payment['is_paid'] else "Pendente"
-            
-            # Formatar a data de vencimento
-            due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d").strftime("%d/%m/%Y")  # Ajuste da data
-
-            # Inserir os dados na tabela
-            self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], payment['amount'], due_date, is_paid))
-
-        for payment in payments.data:
-            client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
-            # Ajuste na exibição de 'Pago': 'Quitado' para True e 'Pendente' para False
-            is_paid = "Quitado" if payment['is_paid'] else "Pendente"
-            self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], payment['amount'], payment['due_date'], is_paid))
 
     def open_client_crud(self):
         """Abrir a tela de CRUD de clientes"""
@@ -301,8 +274,8 @@ class PaymentCRUD:
         self.app = app
         self.top = tk.Toplevel(root)
         self.top.title("Gerenciar Pagamentos")
-        self.top.geometry("800x400")  # Ajuste a largura da janela conforme necessário
-        self.top.resizable(False, False)  # Impede o redimensionamento da janela
+        self.top.geometry("800x400")
+        self.top.resizable(False, False)
 
         self.frame_inputs = tk.Frame(self.top)
         self.frame_inputs.pack(pady=20)
@@ -320,19 +293,29 @@ class PaymentCRUD:
 
         self.label_client = tk.Label(self.frame_inputs, text="Cliente")
         self.label_client.grid(row=2, column=0, padx=10, pady=10)
-        self.client_names = self.load_client_names()  # Carregar os nomes dos clientes
+        self.client_names = self.load_client_names()
         self.combobox_client = ttk.Combobox(self.frame_inputs, values=self.client_names, width=28)
         self.combobox_client.grid(row=2, column=1, padx=10, pady=10)
+        self.combobox_client.bind("<KeyRelease>", self.filter_items)
 
         # Botões de CRUD
-        self.button_add = tk.Button(self.top, text="Adicionar Pagamento", command=self.add_payment)
-        self.button_add.pack(pady=5)
+        self.frame_buttons = tk.Frame(self.top)
+        self.frame_buttons.pack(pady=5)
 
-        self.button_edit = tk.Button(self.top, text="Editar Pagamento", command=self.edit_payment)
-        self.button_edit.pack(pady=5)
+        self.button_add = tk.Button(self.frame_buttons, text="Adicionar Pagamento", command=self.add_payment)
+        self.button_add.grid(row=0, column=0, padx=5)
 
-        self.button_delete = tk.Button(self.top, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()])
-        self.button_delete.pack(pady=5)
+        self.button_edit = tk.Button(self.frame_buttons, text="Alterar Valor", command=self.edit_payment)
+        self.button_edit.grid(row=0, column=1, padx=5)
+
+        self.button_edit_client = tk.Button(self.frame_buttons, text="Alterar Cliente", command=self.edit_client)
+        self.button_edit_client.grid(row=0, column=2, padx=5)
+
+        self.button_edit_due_date = tk.Button(self.frame_buttons, text="Alterar Data", command=self.edit_due_date)
+        self.button_edit_due_date.grid(row=0, column=3, padx=5)
+
+        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()])
+        self.button_delete.grid(row=0, column=4, padx=5)
 
         # Botão para atualizar lista
         self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_payments)
@@ -386,6 +369,12 @@ class PaymentCRUD:
         
         for index, row in enumerate(rows):
             table.move(row, '', index)
+            
+    def filter_items(self, event):
+        """Filtrar os nomes dos clientes na combobox"""
+        query = self.combobox_client.get().lower()
+        filtered_names = [name for name in self.client_names if query in name.lower()]
+        self.combobox_client['values'] = filtered_names
 
     def load_payments(self):
         """Carregar pagamentos na tabela"""
@@ -397,7 +386,14 @@ class PaymentCRUD:
         for payment in payments.data:
             client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
             status = "Pago" if payment['is_paid'] else "Pendente"
-            self.payment_table.insert("", "end", values=(payment['id'], client['name'], payment['amount'], payment['due_date'], status))
+            
+            # Verificar e formatar a data de vencimento, se necessário
+            try:
+                due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d").strftime("%d/%m/%Y")  # Ajuste da data
+            except ValueError:
+                due_date = "Data inválida"
+
+            self.payment_table.insert("", "end", values=(payment['id'], client['name'], payment['amount'], due_date, status))
 
     def add_payment(self):
         """Adicionar pagamento"""
@@ -418,52 +414,69 @@ class PaymentCRUD:
         supabase.table("payments").insert(data).execute()
 
         self.entry_amount.delete(0, tk.END)
-        self.entry_due_date.set_date(None)  # Corrigido para None
+        self.entry_due_date.set_date(None)
         self.combobox_client.set('')
 
         self.load_payments()
 
     def edit_payment(self):
-        """Editar pagamento selecionado"""
+        """Editar valor do pagamento selecionado"""
         selected_items = self.payment_table.selection()
-        if len(selected_items) != 1:
-            messagebox.showerror("Erro", "Selecione apenas um pagamento para editar.")
+        if not selected_items:
+            messagebox.showerror("Erro", "Selecione um pagamento para editar.")
             return
-        
-        selected_item = selected_items[0]
-        payment_id = self.payment_table.item(selected_item, 'values')[0]
-        payment = supabase.table("payments").select("*").eq("id", payment_id).execute().data[0]
 
-        self.entry_amount.delete(0, tk.END)
-        self.entry_due_date.set_date('')
-        self.combobox_client.set('')
-
-        self.entry_amount.insert(0, payment["amount"])
-        self.entry_due_date.set_date(payment["due_date"])
-        client_name = supabase.table("clients").select("name").eq("id", payment["client_id"]).execute().data[0]["name"]
-        self.combobox_client.set(client_name)
-
-        self.button_add.config(text="Salvar Alterações", command=lambda: self.save_changes(payment_id))
-
-    def save_changes(self, payment_id):
-        """Salvar as alterações feitas no pagamento"""
+        payment_id = self.payment_table.item(selected_items[0], 'values')[0]
         amount = self.entry_amount.get()
-        due_date = self.entry_due_date.get_date()
+
+        if not amount:
+            messagebox.showerror("Erro", "Preencha o valor do pagamento.")
+            return
+
+        data = {"amount": amount}
+        supabase.table("payments").update(data).eq("id", payment_id).execute()
+
+        self.load_payments()
+
+    def edit_client(self):
+        """Editar cliente do pagamento selecionado"""
+        selected_items = self.payment_table.selection()
+        if not selected_items:
+            messagebox.showerror("Erro", "Selecione um pagamento para editar.")
+            return
+
+        payment_id = self.payment_table.item(selected_items[0], 'values')[0]
         client_name = self.combobox_client.get()
 
-        if not amount or not due_date or not client_name:
-            messagebox.showerror("Erro", "Preencha todos os campos.")
+        if not client_name:
+            messagebox.showerror("Erro", "Preencha o nome do cliente.")
             return
 
         client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
-        supabase.table("payments").update({"amount": amount, "due_date": due_date, "client_id": client_id}).eq("id", payment_id).execute()
+        data = {"client_id": client_id}
+        supabase.table("payments").update(data).eq("id", payment_id).execute()
+
         self.load_payments()
 
-        self.entry_amount.delete(0, tk.END)
-        self.entry_due_date.set_date('')
-        self.combobox_client.set('')
+    def edit_due_date(self):
+        """Editar data de vencimento do pagamento selecionado"""
+        selected_items = self.payment_table.selection()
+        if not selected_items:
+            messagebox.showerror("Erro", "Selecione um pagamento para editar.")
+            return
 
-        self.button_add.config(text="Adicionar Pagamento", command=self.add_payment)
+        payment_id = self.payment_table.item(selected_items[0], 'values')[0]
+        due_date = self.entry_due_date.get_date()
+
+        if not due_date:
+            messagebox.showerror("Erro", "Preencha a data de vencimento.")
+            return
+
+        due_date_str = due_date.strftime("%Y-%m-%d")
+        data = {"due_date": due_date_str}
+        supabase.table("payments").update(data).eq("id", payment_id).execute()
+
+        self.load_payments()
 
     def delete_payments(self):
         """Excluir pagamentos selecionados"""
@@ -491,6 +504,8 @@ class PaymentCRUD:
         else:
             self.button_edit.config(state="disabled")
             self.button_delete.config(state="disabled")
+
+
 
 
 # Criando a janela principal
