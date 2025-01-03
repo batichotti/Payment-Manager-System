@@ -60,12 +60,6 @@ class PaymentApp:
         self.button_refresh = tk.Button(self.top_frame, text="Atualizar Lista", command=self.load_data)
         self.button_refresh.grid(row=0, column=2, padx=10, pady=10)
 
-        # Variável para controlar se algum CRUD está aberto
-        self.crud_open = False
-
-        # Controla o evento de fechamento da janela principal
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
         rows = list(table.get_children())
@@ -90,22 +84,11 @@ class PaymentApp:
 
     def open_client_crud(self):
         """Abrir a tela de CRUD de clientes"""
-        if not self.crud_open:
-            self.crud_open = True
-            ClientCRUD(self.root, self)
+        ClientCRUD(self.root, self)
 
     def open_payment_crud(self):
         """Abrir a tela de CRUD de pagamentos"""
-        if not self.crud_open:
-            self.crud_open = True
-            PaymentCRUD(self.root, self)
-
-    def on_close(self):
-        """Prevenir fechamento da janela principal enquanto um CRUD estiver aberto"""
-        if self.crud_open:
-            messagebox.showerror("Erro", "Feche as janelas de CRUD antes de sair.")
-        else:
-            self.root.destroy()
+        PaymentCRUD(self.root, self)
 
 class ClientCRUD:
     def __init__(self, root, app):
@@ -173,9 +156,6 @@ class ClientCRUD:
 
         self.load_clients()
 
-        # Atualizar a lista de pagamentos quando fechar o CRUD
-        self.top.protocol("WM_DELETE_WINDOW", self.on_close)
-
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
         rows = list(table.get_children())
@@ -217,8 +197,21 @@ class ClientCRUD:
         if len(selected_items) != 1:
             messagebox.showerror("Erro", "Selecione apenas um cliente para editar.")
             return
+        
+        selected_item = selected_items[0]
+        client_id = self.client_table.item(selected_item, 'values')[0]
+        client = supabase.table("clients").select("*").eq("id", client_id).execute().data[0]
 
-        client_id = self.client_table.item(selected_items[0])['values'][0]
+        self.entry_name.delete(0, tk.END)
+        self.entry_phone.delete(0, tk.END)
+
+        self.entry_name.insert(0, client["name"])
+        self.entry_phone.insert(0, client["phone"])
+
+        self.button_add.config(text="Salvar Alterações", command=lambda: self.save_changes(client_id))
+
+    def save_changes(self, client_id):
+        """Salvar as alterações feitas no cliente"""
         name = self.entry_name.get()
         phone = self.entry_phone.get()
 
@@ -226,62 +219,66 @@ class ClientCRUD:
             messagebox.showerror("Erro", "Preencha todos os campos.")
             return
 
-        data = {"name": name, "phone": phone}
-        supabase.table("clients").update(data).eq("id", client_id).execute()
-
+        supabase.table("clients").update({"name": name, "phone": phone}).eq("id", client_id).execute()
         self.load_clients()
+
+        self.entry_name.delete(0, tk.END)
+        self.entry_phone.delete(0, tk.END)
+
+        self.button_add.config(text="Adicionar Cliente", command=self.add_client)
 
     def delete_clients(self):
         """Excluir clientes selecionados"""
         selected_items = self.client_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione pelo menos um cliente para excluir.")
+            messagebox.showerror("Erro", "Selecione ao menos um cliente para excluir.")
+            return
+
+        confirm = messagebox.askyesno("Excluir", "Tem certeza que deseja excluir os clientes selecionados?")
+        if not confirm:
             return
 
         for selected_item in selected_items:
-            client_id = self.client_table.item(selected_item)['values'][0]
+            client_id = self.client_table.item(selected_item, 'values')[0]
             supabase.table("clients").delete().eq("id", client_id).execute()
 
         self.load_clients()
 
     def on_select(self, event):
-        """Verifica se a seleção mudou e atualiza o estado do botão"""
+        """Ação ao selecionar um cliente"""
         selected_items = self.client_table.selection()
-        if len(selected_items) > 1:
-            self.button_edit.config(state=tk.DISABLED)
+        if selected_items:
+            self.button_edit.config(state="normal")
+            self.button_delete.config(state="normal")
         else:
-            self.button_edit.config(state=tk.NORMAL)
-
-    def on_close(self):
-        """Fechar CRUD e voltar ao PaymentApp"""
-        self.app.crud_open = False
-        self.top.destroy()
+            self.button_edit.config(state="disabled")
+            self.button_delete.config(state="disabled")
 
 class PaymentCRUD:
     def __init__(self, root, app):
         self.app = app
         self.top = tk.Toplevel(root)
         self.top.title("Gerenciar Pagamentos")
-        self.top.geometry("600x400")
+        self.top.geometry("800x400")  # Ajuste a largura da janela conforme necessário
 
         self.frame_inputs = tk.Frame(self.top)
         self.frame_inputs.pack(pady=20)
 
         # Campos de entrada para pagamento
-        self.label_client = tk.Label(self.frame_inputs, text="Cliente")
-        self.label_client.grid(row=0, column=0, padx=10, pady=10)
-        self.entry_client = tk.Entry(self.frame_inputs, width=30)
-        self.entry_client.grid(row=0, column=1, padx=10, pady=10)
-
         self.label_amount = tk.Label(self.frame_inputs, text="Valor")
-        self.label_amount.grid(row=1, column=0, padx=10, pady=10)
+        self.label_amount.grid(row=0, column=0, padx=10, pady=10)
         self.entry_amount = tk.Entry(self.frame_inputs, width=30)
-        self.entry_amount.grid(row=1, column=1, padx=10, pady=10)
+        self.entry_amount.grid(row=0, column=1, padx=10, pady=10)
 
         self.label_due_date = tk.Label(self.frame_inputs, text="Data de Vencimento")
-        self.label_due_date.grid(row=2, column=0, padx=10, pady=10)
-        self.entry_due_date = DateEntry(self.frame_inputs, width=30, date_pattern='dd/mm/yyyy')
-        self.entry_due_date.grid(row=2, column=1, padx=10, pady=10)
+        self.label_due_date.grid(row=1, column=0, padx=10, pady=10)
+        self.entry_due_date = DateEntry(self.frame_inputs, width=30, background='darkblue', foreground='white', borderwidth=2)
+        self.entry_due_date.grid(row=1, column=1, padx=10, pady=10)
+
+        self.label_client = tk.Label(self.frame_inputs, text="ID do Cliente")
+        self.label_client.grid(row=2, column=0, padx=10, pady=10)
+        self.entry_client = tk.Entry(self.frame_inputs, width=30)
+        self.entry_client.grid(row=2, column=1, padx=10, pady=10)
 
         # Botões de CRUD
         self.button_add = tk.Button(self.top, text="Adicionar Pagamento", command=self.add_payment)
@@ -299,54 +296,39 @@ class PaymentCRUD:
 
         # Tabela de pagamentos
         self.payment_table_frame = tk.Frame(self.top)
-        self.payment_table_frame.pack(pady=20, fill='both', expand=True)
+        self.payment_table_frame.pack(fill='both', expand=True, padx=10, pady=10)
 
         self.payment_table_canvas = tk.Canvas(self.payment_table_frame)
-        self.payment_table_canvas.pack(side="left", fill="both", expand=True)
+        self.payment_table_canvas.grid(row=0, column=0, sticky='nsew')
 
-        self.payment_table_scrollbar = ttk.Scrollbar(self.payment_table_frame, orient="vertical", command=self.payment_table_canvas.yview)
-        self.payment_table_scrollbar.pack(side="right", fill="y")
-
-        self.payment_table_canvas.configure(yscrollcommand=self.payment_table_scrollbar.set)
-
-        # Tabela de pagamentos
-        self.payment_table = ttk.Treeview(self.payment_table_canvas, columns=("ID", "Cliente", "Valor", "Vencimento", "Pago"), show="headings", selectmode="extended")
-        
+        self.payment_table = ttk.Treeview(self.payment_table_canvas, columns=("ID", "Cliente", "Valor", "Data de Vencimento", "Status"), show="headings", selectmode="extended")
         self.payment_table.heading("ID", text="ID", command=lambda: self.sort_table(self.payment_table, "ID"))
         self.payment_table.heading("Cliente", text="Cliente", command=lambda: self.sort_table(self.payment_table, "Cliente"))
         self.payment_table.heading("Valor", text="Valor", command=lambda: self.sort_table(self.payment_table, "Valor"))
-        self.payment_table.heading("Vencimento", text="Vencimento", command=lambda: self.sort_table(self.payment_table, "Vencimento"))
-        self.payment_table.heading("Pago", text="Pago", command=lambda: self.sort_table(self.payment_table, "Pago"))
-        
-        # Definir larguras das colunas
+        self.payment_table.heading("Data de Vencimento", text="Data de Vencimento", command=lambda: self.sort_table(self.payment_table, "Data de Vencimento"))
+        self.payment_table.heading("Status", text="Status", command=lambda: self.sort_table(self.payment_table, "Status"))
+
+        # Ajustar o tamanho das colunas para torná-las visíveis
         self.payment_table.column("ID", width=50, anchor="center")
-        self.payment_table.column("Cliente", width=150, anchor="w")
-        self.payment_table.column("Valor", width=100, anchor="center")
-        self.payment_table.column("Vencimento", width=120, anchor="center")
-        self.payment_table.column("Pago", width=80, anchor="center")
-        
+        self.payment_table.column("Cliente", width=250, anchor="w")
+        self.payment_table.column("Valor", width=150, anchor="center")
+        self.payment_table.column("Data de Vencimento", width=150, anchor="center")
+        self.payment_table.column("Status", width=150, anchor="center")
+
         self.payment_table.grid(row=0, column=0, sticky='nsew')
 
-        # Ajustar o grid do canvas para preencher a tela
         self.payment_table_frame.grid_rowconfigure(0, weight=1)
         self.payment_table_frame.grid_columnconfigure(0, weight=1)
 
-        # Criar janela no canvas e vincular ao Treeview
-        self.payment_table_canvas.create_window((0, 0), window=self.payment_table, anchor="nw")
+        self.payment_table_scrollbar = ttk.Scrollbar(self.payment_table_frame, orient="vertical", command=self.payment_table_canvas.yview)
+        self.payment_table_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.payment_table_canvas.configure(yscrollcommand=self.payment_table_scrollbar.set)
 
-        # Ajuste de redimensionamento
-        self.payment_table.bind('<Configure>', self.on_table_configure)
+        self.payment_table_canvas.create_window((0, 0), window=self.payment_table, anchor="nw")
 
         self.payment_table.bind('<<TreeviewSelect>>', self.on_select)
 
         self.load_payments()
-
-        # Atualizar a lista de pagamentos quando fechar o CRUD
-        self.top.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    def on_table_configure(self, event):
-        # Atualiza a área de rolagem para o Treeview
-        self.payment_table_canvas.config(scrollregion=self.payment_table_canvas.bbox("all"))
 
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
@@ -365,32 +347,25 @@ class PaymentCRUD:
 
         for payment in payments.data:
             client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
-            # Ajuste na exibição de 'Pago': 'Quitado' para True e 'Pendente' para False
-            is_paid = "Quitado" if payment['is_paid'] else "Pendente"
-            self.payment_table.insert("", "end", values=(payment['id'], client['name'], payment['amount'], payment['due_date'], is_paid))
+            status = "Pago" if payment['is_paid'] else "Pendente"
+            self.payment_table.insert("", "end", values=(payment['id'], client['name'], payment['amount'], payment['due_date'], status))
 
     def add_payment(self):
         """Adicionar pagamento"""
-        client_name = self.entry_client.get()
         amount = self.entry_amount.get()
-        due_date = self.entry_due_date.get()
+        due_date = self.entry_due_date.get_date()
+        client_id = self.entry_client.get()
 
-        if not client_name or not amount or not due_date:
+        if not amount or not due_date or not client_id:
             messagebox.showerror("Erro", "Preencha todos os campos.")
             return
 
-        client = supabase.table("clients").select("id").eq("name", client_name).execute().data
-        if not client:
-            messagebox.showerror("Erro", "Cliente não encontrado.")
-            return
-
-        data = {
-            "client_id": client[0]['id'],
-            "amount": float(amount),
-            "due_date": due_date,
-            "is_paid": False
-        }
+        data = {"amount": amount, "due_date": due_date, "client_id": client_id, "is_paid": False}
         supabase.table("payments").insert(data).execute()
+
+        self.entry_amount.delete(0, tk.END)
+        self.entry_due_date.set_date('')
+        self.entry_client.delete(0, tk.END)
 
         self.load_payments()
 
@@ -400,48 +375,66 @@ class PaymentCRUD:
         if len(selected_items) != 1:
             messagebox.showerror("Erro", "Selecione apenas um pagamento para editar.")
             return
+        
+        selected_item = selected_items[0]
+        payment_id = self.payment_table.item(selected_item, 'values')[0]
+        payment = supabase.table("payments").select("*").eq("id", payment_id).execute().data[0]
 
-        payment_id = self.payment_table.item(selected_items[0])['values'][0]
+        self.entry_amount.delete(0, tk.END)
+        self.entry_due_date.set_date('')
+        self.entry_client.delete(0, tk.END)
+
+        self.entry_amount.insert(0, payment["amount"])
+        self.entry_due_date.set_date(payment["due_date"])
+        self.entry_client.insert(0, payment["client_id"])
+
+        self.button_add.config(text="Salvar Alterações", command=lambda: self.save_changes(payment_id))
+
+    def save_changes(self, payment_id):
+        """Salvar as alterações feitas no pagamento"""
         amount = self.entry_amount.get()
-        due_date = self.entry_due_date.get()
+        due_date = self.entry_due_date.get_date()
+        client_id = self.entry_client.get()
 
-        if not amount or not due_date:
+        if not amount or not due_date or not client_id:
             messagebox.showerror("Erro", "Preencha todos os campos.")
             return
 
-        data = {
-            "amount": float(amount),
-            "due_date": due_date
-        }
-        supabase.table("payments").update(data).eq("id", payment_id).execute()
-
+        supabase.table("payments").update({"amount": amount, "due_date": due_date, "client_id": client_id}).eq("id", payment_id).execute()
         self.load_payments()
+
+        self.entry_amount.delete(0, tk.END)
+        self.entry_due_date.set_date('')
+        self.entry_client.delete(0, tk.END)
+
+        self.button_add.config(text="Adicionar Pagamento", command=self.add_payment)
 
     def delete_payments(self):
         """Excluir pagamentos selecionados"""
         selected_items = self.payment_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione pelo menos um pagamento para excluir.")
+            messagebox.showerror("Erro", "Selecione ao menos um pagamento para excluir.")
+            return
+
+        confirm = messagebox.askyesno("Excluir", "Tem certeza que deseja excluir os pagamentos selecionados?")
+        if not confirm:
             return
 
         for selected_item in selected_items:
-            payment_id = self.payment_table.item(selected_item)['values'][0]
+            payment_id = self.payment_table.item(selected_item, 'values')[0]
             supabase.table("payments").delete().eq("id", payment_id).execute()
 
         self.load_payments()
 
     def on_select(self, event):
-        """Verifica se a seleção mudou e atualiza o estado do botão"""
+        """Ação ao selecionar um pagamento"""
         selected_items = self.payment_table.selection()
-        if len(selected_items) > 1:
-            self.button_edit.config(state=tk.DISABLED)
+        if selected_items:
+            self.button_edit.config(state="normal")
+            self.button_delete.config(state="normal")
         else:
-            self.button_edit.config(state=tk.NORMAL)
-
-    def on_close(self):
-        """Fechar CRUD e voltar ao PaymentApp"""
-        self.app.crud_open = False
-        self.top.destroy()
+            self.button_edit.config(state="disabled")
+            self.button_delete.config(state="disabled")
 
 # Criando a janela principal
 root = tk.Tk()
