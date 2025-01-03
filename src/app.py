@@ -144,26 +144,28 @@ class ClientCRUD:
 
         # Tabela de clientes
         self.client_table_frame = tk.Frame(self.top)
-        self.client_table_frame.pack(pady=20)
+        self.client_table_frame.pack(fill='both', expand=True, padx=10, pady=10)
 
         self.client_table_canvas = tk.Canvas(self.client_table_frame)
         self.client_table_canvas.grid(row=0, column=0)
-
-        self.client_table_scrollbar = ttk.Scrollbar(self.client_table_frame, orient="vertical", command=self.client_table_canvas.yview)
-        self.client_table_scrollbar.grid(row=0, column=1, sticky="ns")
-
-        self.client_table_canvas.configure(yscrollcommand=self.client_table_scrollbar.set)
-
-        self.client_table_frame.grid_rowconfigure(0, weight=1)
-        self.client_table_frame.grid_columnconfigure(0, weight=1)
-
-        self.client_table_frame.grid_rowconfigure(0, weight=1)
 
         self.client_table = ttk.Treeview(self.client_table_canvas, columns=("ID", "Nome", "Telefone"), show="headings", selectmode="extended")
         self.client_table.heading("ID", text="ID", command=lambda: self.sort_table(self.client_table, "ID"))
         self.client_table.heading("Nome", text="Nome", command=lambda: self.sort_table(self.client_table, "Nome"))
         self.client_table.heading("Telefone", text="Telefone", command=lambda: self.sort_table(self.client_table, "Telefone"))
-        self.client_table.grid(row=0, column=0)
+        
+        self.client_table.column("ID", width=50, anchor="center")
+        self.client_table.column("Nome", width=200, anchor="w")
+        self.client_table.column("Telefone", width=150, anchor="center")
+
+        self.client_table.grid(row=0, column=0, sticky='nsew')
+
+        self.client_table_frame.grid_rowconfigure(0, weight=1)
+        self.client_table_frame.grid_columnconfigure(0, weight=1)
+
+        self.client_table_scrollbar = ttk.Scrollbar(self.client_table_frame, orient="vertical", command=self.client_table_canvas.yview)
+        self.client_table_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.client_table_canvas.configure(yscrollcommand=self.client_table_scrollbar.set)
 
         self.client_table_canvas.create_window((0, 0), window=self.client_table, anchor="nw")
 
@@ -297,28 +299,43 @@ class PaymentCRUD:
 
         # Tabela de pagamentos
         self.payment_table_frame = tk.Frame(self.top)
-        self.payment_table_frame.pack(pady=20)
+        self.payment_table_frame.pack(pady=20, fill='both', expand=True)
 
         self.payment_table_canvas = tk.Canvas(self.payment_table_frame)
-        self.payment_table_canvas.grid(row=0, column=0)
+        self.payment_table_canvas.pack(side="left", fill="both", expand=True)
 
         self.payment_table_scrollbar = ttk.Scrollbar(self.payment_table_frame, orient="vertical", command=self.payment_table_canvas.yview)
-        self.payment_table_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.payment_table_scrollbar.pack(side="right", fill="y")
 
         self.payment_table_canvas.configure(yscrollcommand=self.payment_table_scrollbar.set)
 
-        self.payment_table_frame.grid_rowconfigure(0, weight=1)
-        self.payment_table_frame.grid_columnconfigure(0, weight=1)
-
+        # Tabela de pagamentos
         self.payment_table = ttk.Treeview(self.payment_table_canvas, columns=("ID", "Cliente", "Valor", "Vencimento", "Pago"), show="headings", selectmode="extended")
+        
         self.payment_table.heading("ID", text="ID", command=lambda: self.sort_table(self.payment_table, "ID"))
         self.payment_table.heading("Cliente", text="Cliente", command=lambda: self.sort_table(self.payment_table, "Cliente"))
         self.payment_table.heading("Valor", text="Valor", command=lambda: self.sort_table(self.payment_table, "Valor"))
         self.payment_table.heading("Vencimento", text="Vencimento", command=lambda: self.sort_table(self.payment_table, "Vencimento"))
         self.payment_table.heading("Pago", text="Pago", command=lambda: self.sort_table(self.payment_table, "Pago"))
-        self.payment_table.grid(row=0, column=0)
+        
+        # Definir larguras das colunas
+        self.payment_table.column("ID", width=50, anchor="center")
+        self.payment_table.column("Cliente", width=150, anchor="w")
+        self.payment_table.column("Valor", width=100, anchor="center")
+        self.payment_table.column("Vencimento", width=120, anchor="center")
+        self.payment_table.column("Pago", width=80, anchor="center")
+        
+        self.payment_table.grid(row=0, column=0, sticky='nsew')
 
+        # Ajustar o grid do canvas para preencher a tela
+        self.payment_table_frame.grid_rowconfigure(0, weight=1)
+        self.payment_table_frame.grid_columnconfigure(0, weight=1)
+
+        # Criar janela no canvas e vincular ao Treeview
         self.payment_table_canvas.create_window((0, 0), window=self.payment_table, anchor="nw")
+
+        # Ajuste de redimensionamento
+        self.payment_table.bind('<Configure>', self.on_table_configure)
 
         self.payment_table.bind('<<TreeviewSelect>>', self.on_select)
 
@@ -326,6 +343,10 @@ class PaymentCRUD:
 
         # Atualizar a lista de pagamentos quando fechar o CRUD
         self.top.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def on_table_configure(self, event):
+        # Atualiza a área de rolagem para o Treeview
+        self.payment_table_canvas.config(scrollregion=self.payment_table_canvas.bbox("all"))
 
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
