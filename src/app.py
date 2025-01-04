@@ -45,9 +45,6 @@ class PaymentApp:
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
 
-        # Carregar dados na tabela de pagamentos
-        self.load_data()
-
         # Frame superior com botões
         self.top_frame = tk.Frame(self.root)
         self.top_frame.pack(pady=10)
@@ -71,6 +68,14 @@ class PaymentApp:
         # Botão para filtrar por cliente
         self.button_filter = tk.Button(self.top_frame, text="Filtrar por Cliente", command=self.filter_by_client)
         self.button_filter.grid(row=0, column=4, padx=10, pady=10)
+
+        # Botão para esconder/mostrar pagamentos quitados
+        self.show_paid_var = tk.BooleanVar(value=True)
+        self.button_toggle_paid = tk.Button(self.top_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid)
+        self.button_toggle_paid.grid(row=0, column=5, padx=10, pady=10)
+
+        # Carregar dados na tabela de pagamentos
+        self.load_data()
 
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
@@ -108,8 +113,9 @@ class PaymentApp:
             # Formatar o valor com duas casas decimais e trocar . por ,
             amount = f"{float(payment['amount']):.2f}".replace('.', ',')
 
-            # Inserir os dados na tabela
-            self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], amount, due_date, is_paid))
+            # Inserir os dados na tabela, se a exibição de quitados estiver habilitada ou se o pagamento não estiver quitado
+            if self.show_paid_var.get() or not payment['is_paid']:
+                self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], amount, due_date, is_paid))
 
     def refresh_data(self):
         """Atualizar dados da tabela e combobox de clientes"""
@@ -159,6 +165,15 @@ class PaymentApp:
             except ValueError:
                 due_date = "Data inválida"
             self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], payment['amount'], due_date, is_paid))
+
+    def toggle_paid(self):
+        """Alternar a exibição de pagamentos quitados"""
+        self.show_paid_var.set(not self.show_paid_var.get())
+        if self.show_paid_var.get():
+            self.button_toggle_paid.config(text="Esconder Pagamentos Quitados")
+        else:
+            self.button_toggle_paid.config(text="Mostrar Pagamentos Quitados")
+        self.refresh_data()
 
 class ClientCRUD:
     def __init__(self, root, app):
@@ -445,6 +460,11 @@ class PaymentCRUD:
 
         self.payment_table.bind('<<TreeviewSelect>>', self.on_select)
 
+        # Botão para esconder/mostrar pagamentos quitados
+        self.show_paid_var = tk.BooleanVar(value=True)
+        self.button_toggle_paid = tk.Button(self.top, text="Esconder Pagamentos Quitados", command=self.toggle_paid)
+        self.button_toggle_paid.pack(pady=5)
+
         self.load_payments()
 
     def validate_amount(self, new_value):
@@ -505,7 +525,9 @@ class PaymentCRUD:
             # Formatar o valor com duas casas decimais e trocar . por ,
             amount = f"{float(payment['amount']):.2f}".replace('.', ',')
 
-            self.payment_table.insert("", "end", values=(payment['id'], client['name'], amount, due_date, status))
+            # Inserir os dados na tabela, se a exibição de quitados estiver habilitada ou se o pagamento não estiver quitado
+            if self.show_paid_var.get() or not payment['is_paid']:
+                self.payment_table.insert("", "end", values=(payment['id'], client['name'], amount, due_date, status))
 
     def add_payment(self):
         """Adicionar pagamento"""
@@ -654,6 +676,15 @@ class PaymentCRUD:
             except ValueError:
                 due_date = "Data inválida"
             self.payment_table.insert("", "end", values=(payment['id'], client['name'], payment['amount'], due_date, status))
+
+    def toggle_paid(self):
+        """Alternar a exibição de pagamentos quitados"""
+        self.show_paid_var.set(not self.show_paid_var.get())
+        if self.show_paid_var.get():
+            self.button_toggle_paid.config(text="Esconder Pagamentos Quitados")
+        else:
+            self.button_toggle_paid.config(text="Mostrar Pagamentos Quitados")
+        self.load_payments()
 
 # Criando a janela principal
 root = tk.Tk()
