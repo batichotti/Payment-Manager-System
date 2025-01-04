@@ -1,7 +1,6 @@
 import os
-import json
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from tkcalendar import DateEntry
@@ -24,6 +23,27 @@ class PaymentApp:
         self.root.geometry("1400x600")  # Define a geometria fixa
         self.root.resizable(False, False)  # Impede o redimensionamento da janela
 
+        # Handle window close event
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        # Frame superior com botões de filtro
+        self.filter_frame = tk.Frame(self.root)
+        self.filter_frame.pack(pady=10)
+
+        # Combobox para selecionar cliente
+        self.client_names = self.load_client_names()
+        self.combobox_client_filter = ttk.Combobox(self.filter_frame, values=self.client_names, width=28)
+        self.combobox_client_filter.grid(row=0, column=0, padx=10, pady=10)
+
+        # Botão para filtrar por cliente
+        self.button_filter = tk.Button(self.filter_frame, text="Filtrar por Cliente", command=self.filter_by_client)
+        self.button_filter.grid(row=0, column=1, padx=10, pady=10)
+
+        # Botão para esconder/mostrar pagamentos quitados
+        self.show_paid_var = tk.BooleanVar(value=True)
+        self.button_toggle_paid = tk.Button(self.filter_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid)
+        self.button_toggle_paid.grid(row=0, column=2, padx=10, pady=10)
+
         # Tabela para exibir pagamentos
         self.table_frame = tk.Frame(self.root)
         self.table_frame.pack(fill='both', expand=True, padx=10, pady=20)
@@ -45,49 +65,49 @@ class PaymentApp:
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
 
-        # Frame superior com botões
-        self.top_frame = tk.Frame(self.root)
-        self.top_frame.pack(pady=10)
+        # Frame inferior com botões de CRUD e atualizar lista
+        self.bottom_frame = tk.Frame(self.root)
+        self.bottom_frame.pack(pady=10)
 
         # Botões de CRUD
-        self.button_client_crud = tk.Button(self.top_frame, text="Gerenciar Clientes", command=self.open_client_crud)
+        self.button_client_crud = tk.Button(self.bottom_frame, text="Gerenciar Clientes", command=self.open_client_crud)
         self.button_client_crud.grid(row=0, column=0, padx=10, pady=10)
 
-        self.button_payment_crud = tk.Button(self.top_frame, text="Gerenciar Pagamentos", command=self.open_payment_crud)
+        self.button_payment_crud = tk.Button(self.bottom_frame, text="Gerenciar Pagamentos", command=self.open_payment_crud)
         self.button_payment_crud.grid(row=0, column=1, padx=10, pady=10)
 
         # Botão para atualizar lista
-        self.button_refresh = tk.Button(self.top_frame, text="Atualizar Lista", command=self.refresh_data)
+        self.button_refresh = tk.Button(self.bottom_frame, text="Atualizar Lista", command=self.refresh_data)
         self.button_refresh.grid(row=0, column=2, padx=10, pady=10)
-
-        # Combobox para selecionar cliente
-        self.client_names = self.load_client_names()
-        self.combobox_client_filter = ttk.Combobox(self.top_frame, values=self.client_names, width=28)
-        self.combobox_client_filter.grid(row=0, column=3, padx=10, pady=10)
-
-        # Botão para filtrar por cliente
-        self.button_filter = tk.Button(self.top_frame, text="Filtrar por Cliente", command=self.filter_by_client)
-        self.button_filter.grid(row=0, column=4, padx=10, pady=10)
-
-        # Botão para esconder/mostrar pagamentos quitados
-        self.show_paid_var = tk.BooleanVar(value=True)
-        self.button_toggle_paid = tk.Button(self.top_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid)
-        self.button_toggle_paid.grid(row=0, column=5, padx=10, pady=10)
 
         # Carregar dados na tabela de pagamentos
         self.load_data()
+        self.sort_order = {}  # Dictionary to keep track of sort order for each column
+
+    def on_closing(self):
+        """Handle the closing of the main window"""
+        if messagebox.askokcancel("Sair", "Tem certeza que deseja fechar o aplicativo? Isso fechará todas as janelas abertas."):
+            for window in self.root.winfo_children():
+                if isinstance(window, tk.Toplevel):
+                    window.destroy()
+            self.root.destroy()
 
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
         rows = list(table.get_children())
+        if column not in self.sort_order:
+            self.sort_order[column] = False  # Default to ascending order
+
         if column == "Valor":
-            rows.sort(key=lambda row: float(table.item(row)["values"][table["columns"].index(column)].replace(',', '')))
+            rows.sort(key=lambda row: float(table.item(row)["values"][table["columns"].index(column)].replace(',', '')), reverse=self.sort_order[column])
         else:
-            rows.sort(key=lambda row: table.item(row)["values"][table["columns"].index(column)])
+            rows.sort(key=lambda row: table.item(row)["values"][table["columns"].index(column)], reverse=self.sort_order[column])
         
         for index, row in enumerate(rows):
             table.move(row, '', index)
-            
+        
+        self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
+
     def load_data(self):
         """Carregar pagamentos na tabela"""
         for row in self.table.get_children():
@@ -183,6 +203,8 @@ class ClientCRUD:
         self.top.geometry("600x400")
         self.top.resizable(False, False)
 
+        self.sort_order = {}  # Dictionary to keep track of sort order for each column
+
         self.frame_inputs = tk.Frame(self.top)
         self.frame_inputs.pack(pady=20)
 
@@ -255,10 +277,15 @@ class ClientCRUD:
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
         rows = list(table.get_children())
-        rows.sort(key=lambda row: table.item(row)["values"][table["columns"].index(column)])
+        if column not in self.sort_order:
+            self.sort_order[column] = False  # Default to ascending order
+
+        rows.sort(key=lambda row: table.item(row)["values"][table["columns"].index(column)], reverse=self.sort_order[column])
         
         for index, row in enumerate(rows):
             table.move(row, '', index)
+        
+        self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
 
     def load_clients(self):
         """Carregar clientes na tabela"""
@@ -276,7 +303,7 @@ class ClientCRUD:
         phone = self.entry_phone.get()
 
         if not name or not phone:
-            messagebox.showerror("Erro", "Preencha todos os campos.")
+            self.show_messagebox("Erro", "Preencha todos os campos.")
             return
 
         data = {"name": name, "phone": phone}
@@ -291,7 +318,7 @@ class ClientCRUD:
         """Editar nome do cliente selecionado"""
         selected_items = self.client_table.selection()
         if len(selected_items) != 1:
-            messagebox.showerror("Erro", "Selecione apenas um cliente para editar.")
+            self.show_messagebox("Erro", "Selecione apenas um cliente para editar.")
             return
         
         selected_item = selected_items[0]
@@ -299,7 +326,7 @@ class ClientCRUD:
         new_name = self.entry_name.get()
 
         if not new_name:
-            messagebox.showerror("Erro", "Preencha o novo nome do cliente.")
+            self.show_messagebox("Erro", "Preencha o novo nome do cliente.")
             return
 
         supabase.table("clients").update({"name": new_name}).eq("id", client_id).execute()
@@ -309,7 +336,7 @@ class ClientCRUD:
         """Editar telefone do cliente selecionado"""
         selected_items = self.client_table.selection()
         if len(selected_items) != 1:
-            messagebox.showerror("Erro", "Selecione apenas um cliente para editar.")
+            self.show_messagebox("Erro", "Selecione apenas um cliente para editar.")
             return
         
         selected_item = selected_items[0]
@@ -317,7 +344,7 @@ class ClientCRUD:
         new_phone = self.entry_phone.get()
 
         if not new_phone:
-            messagebox.showerror("Erro", "Preencha o novo telefone do cliente.")
+            self.show_messagebox("Erro", "Preencha o novo telefone do cliente.")
             return
 
         supabase.table("clients").update({"phone": new_phone}).eq("id", client_id).execute()
@@ -327,7 +354,7 @@ class ClientCRUD:
         """Excluir clientes selecionados"""
         selected_items = self.client_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione ao menos um cliente para excluir.")
+            self.show_messagebox("Erro", "Selecione ao menos um cliente para excluir.")
             return
 
         confirm = messagebox.askyesno("Excluir", "Tem certeza que deseja excluir os clientes selecionados?")
@@ -356,7 +383,7 @@ class ClientCRUD:
         """Filtrar clientes por nome similar"""
         client_name = self.entry_name.get()
         if not client_name:
-            messagebox.showerror("Erro", "Digite um nome para filtrar.")
+            self.show_messagebox("Erro", "Digite um nome para filtrar.")
             return
 
         clients = supabase.table("clients").select("*").ilike("name", f"%{client_name}%").execute()
@@ -367,6 +394,11 @@ class ClientCRUD:
         for client in clients.data:
             self.client_table.insert("", "end", values=(client['id'], client['name'], client['phone']))
 
+    def show_messagebox(self, title, message, icon=messagebox.ERROR):
+        """Show a messagebox and keep the CRUD window in front"""
+        self.top.lift()
+        messagebox.showerror(title, message, parent=self.top)
+
 class PaymentCRUD:
     def __init__(self, root, app):
         self.app = app
@@ -374,6 +406,8 @@ class PaymentCRUD:
         self.top.title("Gerenciar Pagamentos")
         self.top.geometry("800x400")
         self.top.resizable(False, False)
+
+        self.sort_order = {}  # Dictionary to keep track of sort order for each column
 
         self.frame_inputs = tk.Frame(self.top)
         self.frame_inputs.pack(pady=20)
@@ -491,14 +525,19 @@ class PaymentCRUD:
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
         rows = list(table.get_children())
+        if column not in self.sort_order:
+            self.sort_order[column] = False  # Default to ascending order
+
         if column == "Valor":
-            rows.sort(key=lambda row: float(table.item(row)["values"][table["columns"].index(column)].replace(',', '')))
+            rows.sort(key=lambda row: float(table.item(row)["values"][table["columns"].index(column)].replace(',', '')), reverse=self.sort_order[column])
         else:
-            rows.sort(key=lambda row: table.item(row)["values"][table["columns"].index(column)])
+            rows.sort(key=lambda row: table.item(row)["values"][table["columns"].index(column)], reverse=self.sort_order[column])
         
         for index, row in enumerate(rows):
             table.move(row, '', index)
-            
+        
+        self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
+
     def filter_items(self, event):
         """Filtrar os nomes dos clientes na combobox"""
         query = self.combobox_client.get().lower()
@@ -536,7 +575,7 @@ class PaymentCRUD:
         client_name = self.combobox_client.get()
 
         if not amount or not due_date or not client_name:
-            messagebox.showerror("Erro", "Preencha todos os campos.")
+            self.show_messagebox("Erro", "Preencha todos os campos.")
             return
 
         client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
@@ -557,14 +596,14 @@ class PaymentCRUD:
         """Editar valor do pagamento selecionado"""
         selected_items = self.payment_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione um pagamento para editar.")
+            self.show_messagebox("Erro", "Selecione um pagamento para editar.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
         amount = self.entry_amount.get().replace(',', '.')
 
         if not amount:
-            messagebox.showerror("Erro", "Preencha o valor do pagamento.")
+            self.show_messagebox("Erro", "Preencha o valor do pagamento.")
             return
 
         data = {"amount": float(amount)}
@@ -576,14 +615,14 @@ class PaymentCRUD:
         """Editar cliente do pagamento selecionado"""
         selected_items = self.payment_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione um pagamento para editar.")
+            self.show_messagebox("Erro", "Selecione um pagamento para editar.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
         client_name = self.combobox_client.get()
 
         if not client_name:
-            messagebox.showerror("Erro", "Preencha o nome do cliente.")
+            self.show_messagebox("Erro", "Preencha o nome do cliente.")
             return
 
         client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
@@ -596,14 +635,14 @@ class PaymentCRUD:
         """Editar data de vencimento do pagamento selecionado"""
         selected_items = self.payment_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione um pagamento para editar.")
+            self.show_messagebox("Erro", "Selecione um pagamento para editar.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
         due_date = self.entry_due_date.get_date()
 
         if not due_date:
-            messagebox.showerror("Erro", "Preencha a data de vencimento.")
+            self.show_messagebox("Erro", "Preencha a data de vencimento.")
             return
 
         due_date_str = due_date.strftime("%Y-%m-%d")
@@ -616,7 +655,7 @@ class PaymentCRUD:
         """Excluir pagamentos selecionados"""
         selected_items = self.payment_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione ao menos um pagamento para excluir.")
+            self.show_messagebox("Erro", "Selecione ao menos um pagamento para excluir.")
             return
 
         confirm = messagebox.askyesno("Excluir", "Tem certeza que deseja excluir os pagamentos selecionados?")
@@ -633,7 +672,7 @@ class PaymentCRUD:
         """Alterar o status do pagamento selecionado"""
         selected_items = self.payment_table.selection()
         if not selected_items:
-            messagebox.showerror("Erro", "Selecione um pagamento para alterar o status.")
+            self.show_messagebox("Erro", "Selecione um pagamento para alterar o status.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
@@ -659,7 +698,7 @@ class PaymentCRUD:
         """Filtrar pagamentos por cliente"""
         client_name = self.combobox_client.get()
         if not client_name:
-            messagebox.showerror("Erro", "Selecione um cliente para filtrar.")
+            self.show_messagebox("Erro", "Selecione um cliente para filtrar.")
             return
 
         client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
@@ -685,6 +724,11 @@ class PaymentCRUD:
         else:
             self.button_toggle_paid.config(text="Mostrar Pagamentos Quitados")
         self.load_payments()
+
+    def show_messagebox(self, title, message, icon=messagebox.ERROR):
+        """Show a messagebox and keep the CRUD window in front"""
+        self.top.lift()
+        messagebox.showerror(title, message, parent=self.top)
 
 # Criando a janela principal
 root = tk.Tk()
