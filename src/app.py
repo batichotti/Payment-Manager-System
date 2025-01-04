@@ -1,3 +1,4 @@
+import re
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -5,6 +6,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from tkcalendar import DateEntry
 from datetime import datetime
+from send_reminder import send_payment_reminder
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -33,16 +35,21 @@ class PaymentApp:
         # Combobox para selecionar cliente
         self.client_names = self.load_client_names()
         self.combobox_client_filter = ttk.Combobox(self.filter_frame, values=self.client_names, width=28)
-        self.combobox_client_filter.grid(row=0, column=0, padx=10, pady=10)
+        self.combobox_client_filter.grid(row=0, column=1, padx=10, pady=10)
+        self.combobox_client_filter.bind("<KeyRelease>", self.filter_items)
+
+        # Botão para enviar cobrança
+        self.button_send_reminder = tk.Button(self.filter_frame, text="Enviar Cobrança", command=self.send_reminder)
+        self.button_send_reminder.grid(row=0, column=0, padx=10, pady=10)
 
         # Botão para filtrar por cliente
         self.button_filter = tk.Button(self.filter_frame, text="Filtrar por Cliente", command=self.filter_by_client)
-        self.button_filter.grid(row=0, column=1, padx=10, pady=10)
+        self.button_filter.grid(row=0, column=2, padx=10, pady=10)
 
         # Botão para esconder/mostrar pagamentos quitados
         self.show_paid_var = tk.BooleanVar(value=True)
         self.button_toggle_paid = tk.Button(self.filter_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid)
-        self.button_toggle_paid.grid(row=0, column=2, padx=10, pady=10)
+        self.button_toggle_paid.grid(row=0, column=3, padx=10, pady=10)
 
         # Tabela para exibir pagamentos
         self.table_frame = tk.Frame(self.root)
@@ -164,6 +171,12 @@ class PaymentApp:
         clients = supabase.table("clients").select("name").execute().data
         return [client['name'] for client in clients]
 
+    def filter_items(self, event):
+        """Filtrar os nomes dos clientes na combobox durante a digitação"""
+        query = self.combobox_client_filter.get().lower()
+        filtered_names = [name for name in self.client_names if query in name.lower()]
+        self.combobox_client_filter['values'] = filtered_names
+
     def filter_by_client(self):
         """Filtrar pagamentos por cliente"""
         client_name = self.combobox_client_filter.get()
@@ -195,6 +208,35 @@ class PaymentApp:
             self.button_toggle_paid.config(text="Mostrar Pagamentos Quitados")
         self.refresh_data()
 
+    def send_reminder(self):
+        """Enviar cobrança para os clientes selecionados"""
+        selected_items = self.table.selection()
+        if not selected_items:
+            messagebox.showerror("Erro", "Selecione pelo menos um pagamento para enviar a cobrança.")
+            return
+
+        payments = []
+        for item in selected_items:
+            payment_id = self.table.item(item, 'values')[0]
+            payment = supabase.table("payments").select("*").eq("id", payment_id).execute().data[0]
+            if payment['is_paid']:
+                continue  # Skip paid payments
+            client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
+            
+            payment_details = {
+                'client_name': client['name'],
+                'client_phone': client['phone'],
+                'amount': payment['amount'],
+                'due_date': payment['due_date']
+            }
+            payments.append(payment_details)
+
+        if payments:
+            send_payment_reminder(payments, method='print')
+            messagebox.showinfo("Sucesso", "Cobranças enviadas com sucesso.")
+        else:
+            messagebox.showinfo("Informação", "Nenhum pagamento pendente selecionado para cobrança.")
+
 class ClientCRUD:
     def __init__(self, root, app):
         self.app = app
@@ -220,8 +262,12 @@ class ClientCRUD:
 
         self.label_phone = tk.Label(self.frame_inputs, text="Telefone")
         self.label_phone.grid(row=1, column=0, padx=10, pady=10)
-        self.entry_phone = tk.Entry(self.frame_inputs, width=30)
+        self.entry_phone = tk.Entry(self.frame_inputs, width=30, fg='gray')
+        self.entry_phone.insert(0, "(XX)XXXXX-XXXX")
         self.entry_phone.grid(row=1, column=1, padx=10, pady=10)
+        self.entry_phone.bind("<FocusIn>", self.on_focus_in)
+        self.entry_phone.bind("<FocusOut>", self.on_focus_out)
+        self.entry_phone.bind("<KeyRelease>", self.format_phone_number)
 
         # Botões de CRUD
         self.frame_buttons = tk.Frame(self.top)
@@ -273,6 +319,24 @@ class ClientCRUD:
         self.client_table.bind('<<TreeviewSelect>>', self.on_select)
 
         self.load_clients()
+
+    def format_phone_number(self, event):
+        phone_number = self.entry_phone.get()
+        phone_number = re.sub(r'\D', '', phone_number)
+        if len(phone_number) == 10:
+            formatted = '({}{}{}){}{}{}-{}{}{}{}'.format(*phone_number)
+            self.entry_phone.delete(0, tk.END)
+            self.entry_phone.insert(0, formatted)
+
+    def on_focus_in(self, event):
+        if self.entry_phone.get() == "(XX)XXXXX-XXXX":
+            self.entry_phone.delete(0, tk.END)
+            self.entry_phone.config(fg='black')
+
+    def on_focus_out(self, event):
+        if self.entry_phone.get() == "":
+            self.entry_phone.insert(0, "(XX)XXXXX-XXXX")
+            self.entry_phone.config(fg='gray')
 
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
@@ -522,6 +586,12 @@ class PaymentCRUD:
         clients = supabase.table("clients").select("name").execute().data
         return [client['name'] for client in clients]
 
+    def filter_items(self, event):
+        """Filtrar os nomes dos clientes na combobox durante a digitação"""
+        query = self.combobox_client.get().lower()
+        filtered_names = [name for name in self.client_names if query in name.lower()]
+        self.combobox_client['values'] = filtered_names
+
     def sort_table(self, table, column):
         """Ordenar a tabela com base na coluna clicada"""
         rows = list(table.get_children())
@@ -537,12 +607,6 @@ class PaymentCRUD:
             table.move(row, '', index)
         
         self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
-
-    def filter_items(self, event):
-        """Filtrar os nomes dos clientes na combobox"""
-        query = self.combobox_client.get().lower()
-        filtered_names = [name for name in self.client_names if query in name.lower()]
-        self.combobox_client['values'] = filtered_names
 
     def load_payments(self):
         """Carregar pagamentos na tabela"""
