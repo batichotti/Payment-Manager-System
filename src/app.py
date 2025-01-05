@@ -232,7 +232,7 @@ class PaymentApp:
             payments.append(payment_details)
 
         if payments:
-            send_payment_reminder(payments, method='print')
+            send_payment_reminder(payments)
             messagebox.showinfo("Sucesso", "Cobranças enviadas com sucesso.")
         else:
             messagebox.showinfo("Informação", "Nenhum pagamento pendente selecionado para cobrança.")
@@ -262,7 +262,7 @@ class ClientCRUD:
 
         self.label_phone = tk.Label(self.frame_inputs, text="Telefone")
         self.label_phone.grid(row=1, column=0, padx=10, pady=10)
-        self.entry_phone = tk.Entry(self.frame_inputs, width=30, fg='gray')
+        self.entry_phone = tk.Entry(self.frame_inputs, width=30, fg='gray', validate="key", validatecommand=(self.top.register(self.validate_phone), '%P'))
         self.entry_phone.insert(0, "(XX)XXXXX-XXXX")
         self.entry_phone.grid(row=1, column=1, padx=10, pady=10)
         self.entry_phone.bind("<FocusIn>", self.on_focus_in)
@@ -276,14 +276,14 @@ class ClientCRUD:
         self.button_add = tk.Button(self.frame_buttons, text="Adicionar Cliente", command=self.add_client)
         self.button_add.grid(row=0, column=0, padx=5)
 
+        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Clientes", command=self.delete_clients)
+        self.button_delete.grid(row=0, column=1, padx=5)
+
         self.button_edit_name = tk.Button(self.frame_buttons, text="Alterar Nome", command=self.edit_client_name)
-        self.button_edit_name.grid(row=0, column=1, padx=5)
+        self.button_edit_name.grid(row=0, column=2, padx=5)
 
         self.button_edit_phone = tk.Button(self.frame_buttons, text="Alterar Telefone", command=self.edit_client_phone)
-        self.button_edit_phone.grid(row=0, column=2, padx=5)
-
-        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Clientes", command=self.delete_clients)
-        self.button_delete.grid(row=0, column=3, padx=5)
+        self.button_edit_phone.grid(row=0, column=3, padx=5)
 
         # Botão para atualizar lista
         self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_clients)
@@ -320,13 +320,25 @@ class ClientCRUD:
 
         self.load_clients()
 
+    def validate_phone(self, new_value):
+        """Validar o valor do campo de entrada para aceitar apenas números e caracteres especiais permitidos"""
+        return all(char.isdigit() or char in "X()-+" for char in new_value)
+
     def format_phone_number(self, event):
         phone_number = self.entry_phone.get()
         phone_number = re.sub(r'\D', '', phone_number)
         if len(phone_number) == 10:
-            formatted = '({}{}{}){}{}{}-{}{}{}{}'.format(*phone_number)
-            self.entry_phone.delete(0, tk.END)
-            self.entry_phone.insert(0, formatted)
+            formatted = '({}{}){}{}{}{}-{}{}{}{}'.format(*phone_number)
+        elif len(phone_number) == 11:
+            formatted = '({}{}){}{}{}{}{}-{}{}{}{}'.format(*phone_number)
+        elif len(phone_number) == 13:
+            formatted = '+{}{}({}{}){}{}{}{}{}-{}{}{}{}'.format(*phone_number)
+        elif len(phone_number) == 14:
+            formatted = '+{}{}{}({}{}){}{}{}{}{}-{}{}{}{}'.format(*phone_number)
+        else:
+            formatted = phone_number
+        self.entry_phone.delete(0, tk.END)
+        self.entry_phone.insert(0, formatted)
 
     def on_focus_in(self, event):
         if self.entry_phone.get() == "(XX)XXXXX-XXXX":
@@ -334,7 +346,9 @@ class ClientCRUD:
             self.entry_phone.config(fg='black')
 
     def on_focus_out(self, event):
-        if self.entry_phone.get() == "":
+        phone_number = re.sub(r'\D', '', self.entry_phone.get())
+        if len(phone_number) < 10 or len(phone_number) > 14:
+            self.entry_phone.delete(0, tk.END)
             self.entry_phone.insert(0, "(XX)XXXXX-XXXX")
             self.entry_phone.config(fg='gray')
 
@@ -364,10 +378,10 @@ class ClientCRUD:
     def add_client(self):
         """Adicionar cliente"""
         name = self.entry_name.get()
-        phone = self.entry_phone.get()
+        phone = re.sub(r'\D', '', self.entry_phone.get())
 
-        if not name or not phone:
-            self.show_messagebox("Erro", "Preencha todos os campos.")
+        if not name or not phone or len(phone) < 10 or len(phone) > 14:
+            self.show_messagebox("Erro", "Telefone Inválido. Preencha todos os campos corretamente.")
             return
 
         data = {"name": name, "phone": phone}
@@ -405,10 +419,10 @@ class ClientCRUD:
         
         selected_item = selected_items[0]
         client_id = self.client_table.item(selected_item, 'values')[0]
-        new_phone = self.entry_phone.get()
+        new_phone = re.sub(r'\D', '', self.entry_phone.get())
 
-        if not new_phone:
-            self.show_messagebox("Erro", "Preencha o novo telefone do cliente.")
+        if not new_phone or len(new_phone) < 10 or len(new_phone) > 14:
+            self.show_messagebox("Erro", "Preencha o novo telefone do cliente corretamente. O telefone deve ter entre 10 e 14 dígitos.")
             return
 
         supabase.table("clients").update({"phone": new_phone}).eq("id", client_id).execute()
@@ -505,16 +519,16 @@ class PaymentCRUD:
         self.button_add.grid(row=0, column=0, padx=5)
 
         self.button_delete = tk.Button(self.frame_buttons, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()])
-        self.button_delete.grid(row=0, column=4, padx=5)
+        self.button_delete.grid(row=0, column=1, padx=5)
 
         self.button_edit_client = tk.Button(self.frame_buttons, text="Alterar Cliente", command=self.edit_client)
         self.button_edit_client.grid(row=0, column=2, padx=5)
 
         self.button_edit = tk.Button(self.frame_buttons, text="Alterar Valor", command=self.edit_payment)
-        self.button_edit.grid(row=0, column=1, padx=5)
+        self.button_edit.grid(row=0, column=3, padx=5)
 
         self.button_edit_due_date = tk.Button(self.frame_buttons, text="Alterar Data", command=self.edit_due_date)
-        self.button_edit_due_date.grid(row=0, column=3, padx=5)
+        self.button_edit_due_date.grid(row=0, column=4, padx=5)
 
         self.button_change_status = tk.Button(self.frame_buttons, text="Alterar Status", command=self.change_status)
         self.button_change_status.grid(row=0, column=5, padx=5)
