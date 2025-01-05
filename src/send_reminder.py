@@ -1,12 +1,6 @@
 import pywhatkit as kit
 from datetime import datetime, timedelta
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
-import urllib.parse
 import webbrowser
 import time
 
@@ -53,6 +47,8 @@ def send_payment_reminder(payments, method='pywhatkit'):
                 send_with_pywhatkit(phone, message)
             elif method == 'selenium':
                 send_with_selenium(phone, message)
+            elif method == 'wa_link':
+                send_with_wa_link(phone, message)
             elif method == 'print':
                 print_message(phone, message)
 
@@ -60,6 +56,9 @@ def send_with_pywhatkit(phone, message):
     kit.sendwhatmsg_instantly(phone, message, wait_time=10, tab_close=True)
 
 def send_with_selenium(phone, message):
+    pass
+
+def send_with_wa_link(phone, message):
     pass
 
 def print_message(phone, message):
