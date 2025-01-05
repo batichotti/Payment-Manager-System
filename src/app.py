@@ -2,21 +2,42 @@ import re
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
-from dotenv import load_dotenv
-from supabase import create_client, Client
 from tkcalendar import DateEntry
 from datetime import datetime
 from send_reminder import send_payment_reminder
+from supabase_client import supabase 
 
-# Carregar variáveis de ambiente
-load_dotenv()
+# Estética
+FONT_NAME = "Arial"
+FONT_SIZE = 12
+FONT = (FONT_NAME, FONT_SIZE)
+TREEVIEW_FONT_SIZE = 14
+TREEVIEW_FONT = (FONT_NAME, TREEVIEW_FONT_SIZE)
 
-# Obter URL e chave do Supabase
-SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+# Padding
+PADX = 10
+PADY = 10
+FRAME_PADY = 20
+BOTTOM_FRAME_PADY = 10
 
-# Criar cliente Supabase
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Colors
+BUTTON_BG_COLOR = "#f0f0f0"
+BUTTON_FG_COLOR = "#000000"
+WINDOW_BG_COLOR = "#ffffff"
+
+# Button styles
+ADD_BUTTON_BG_COLOR = "#d4edda"
+DELETE_BUTTON_BG_COLOR = "#f8d7da"
+EDIT_BUTTON_BG_COLOR = "#fff3cd"
+FILTER_BUTTON_BG_COLOR = "#d1ecf1"
+TOGGLE_BUTTON_BG_COLOR = "#cce5ff"
+SEND_REMINDER_BUTTON_BG_COLOR = "#d1ecf1"
+FILTER_CLIENT_BUTTON_BG_COLOR = "#d1ecf1"
+TOGGLE_PAID_BUTTON_BG_COLOR = "#cce5ff"
+CLIENT_CRUD_BUTTON_BG_COLOR = "#d1ecf1"
+PAYMENT_CRUD_BUTTON_BG_COLOR = "#d1ecf1"
+REFRESH_BUTTON_BG_COLOR = "#d1ecf1"
+
 
 class PaymentApp:
     def __init__(self, root):
@@ -24,36 +45,37 @@ class PaymentApp:
         self.root.title("Sistema de Pagamentos")
         self.root.geometry("1400x600")  # Define a geometria fixa
         self.root.resizable(False, False)  # Impede o redimensionamento da janela
+        self.root.configure(bg=WINDOW_BG_COLOR)
 
         # Handle window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # Frame superior com botões de filtro
-        self.filter_frame = tk.Frame(self.root)
-        self.filter_frame.pack(pady=10)
+        self.filter_frame = tk.Frame(self.root, bg=WINDOW_BG_COLOR)
+        self.filter_frame.pack(pady=PADY)
 
         # Combobox para selecionar cliente
         self.client_names = self.load_client_names()
-        self.combobox_client_filter = ttk.Combobox(self.filter_frame, values=self.client_names, width=28, font=("Arial", 12))
-        self.combobox_client_filter.grid(row=0, column=1, padx=10, pady=10)
+        self.combobox_client_filter = ttk.Combobox(self.filter_frame, values=self.client_names, width=28, font=FONT)
+        self.combobox_client_filter.grid(row=0, column=1, padx=PADX, pady=PADY)
         self.combobox_client_filter.bind("<KeyRelease>", self.filter_items)
 
         # Botão para enviar cobrança
-        self.button_send_reminder = tk.Button(self.filter_frame, text="Enviar Cobrança", command=self.send_reminder, font=("Arial", 12))
-        self.button_send_reminder.grid(row=0, column=0, padx=10, pady=10)
+        self.button_send_reminder = tk.Button(self.filter_frame, text="Enviar Cobrança", command=self.send_reminder, font=FONT, bg=SEND_REMINDER_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_send_reminder.grid(row=0, column=0, padx=PADX, pady=PADY)
 
         # Botão para filtrar por cliente
-        self.button_filter = tk.Button(self.filter_frame, text="Filtrar por Cliente", command=self.filter_by_client, font=("Arial", 12))
-        self.button_filter.grid(row=0, column=2, padx=10, pady=10)
+        self.button_filter = tk.Button(self.filter_frame, text="Filtrar por Cliente", command=self.filter_by_client, font=FONT, bg=FILTER_CLIENT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_filter.grid(row=0, column=2, padx=PADX, pady=PADY)
 
         # Botão para esconder/mostrar pagamentos quitados
         self.show_paid_var = tk.BooleanVar(value=True)
-        self.button_toggle_paid = tk.Button(self.filter_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid, font=("Arial", 12))
-        self.button_toggle_paid.grid(row=0, column=3, padx=10, pady=10)
+        self.button_toggle_paid = tk.Button(self.filter_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid, font=FONT, bg=TOGGLE_PAID_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_toggle_paid.grid(row=0, column=3, padx=PADX, pady=PADY)
 
         # Tabela para exibir pagamentos
-        self.table_frame = tk.Frame(self.root)
-        self.table_frame.pack(fill='both', expand=True, padx=10, pady=20)
+        self.table_frame = tk.Frame(self.root, bg=WINDOW_BG_COLOR)
+        self.table_frame.pack(fill='both', expand=True, padx=PADX, pady=FRAME_PADY)
 
         self.table = ttk.Treeview(self.table_frame, columns=("ID", "Cliente", "Telefone", "Valor", "Data de Vencimento", "Pagamento"), show="headings", style="mystyle.Treeview")
         self.table.heading("ID", text="ID", command=lambda: self.sort_table(self.table, "ID"))
@@ -73,19 +95,19 @@ class PaymentApp:
         self.table_frame.grid_columnconfigure(0, weight=1)
 
         # Frame inferior com botões de CRUD e atualizar lista
-        self.bottom_frame = tk.Frame(self.root)
-        self.bottom_frame.pack(pady=10)
+        self.bottom_frame = tk.Frame(self.root, bg=WINDOW_BG_COLOR)
+        self.bottom_frame.pack(pady=BOTTOM_FRAME_PADY)
 
         # Botões de CRUD
-        self.button_client_crud = tk.Button(self.bottom_frame, text="Gerenciar Clientes", command=self.open_client_crud, font=("Arial", 12))
-        self.button_client_crud.grid(row=0, column=0, padx=10, pady=10)
+        self.button_client_crud = tk.Button(self.bottom_frame, text="Gerenciar Clientes", command=self.open_client_crud, font=FONT, bg=CLIENT_CRUD_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_client_crud.grid(row=0, column=0, padx=PADX, pady=PADY)
 
-        self.button_payment_crud = tk.Button(self.bottom_frame, text="Gerenciar Pagamentos", command=self.open_payment_crud, font=("Arial", 12))
-        self.button_payment_crud.grid(row=0, column=1, padx=10, pady=10)
+        self.button_payment_crud = tk.Button(self.bottom_frame, text="Gerenciar Pagamentos", command=self.open_payment_crud, font=FONT, bg=PAYMENT_CRUD_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_payment_crud.grid(row=0, column=1, padx=PADX, pady=PADY)
 
         # Botão para atualizar lista
-        self.button_refresh = tk.Button(self.bottom_frame, text="Atualizar Lista", command=self.refresh_data, font=("Arial", 12))
-        self.button_refresh.grid(row=0, column=2, padx=10, pady=10)
+        self.button_refresh = tk.Button(self.bottom_frame, text="Atualizar Lista", command=self.refresh_data, font=FONT, bg=REFRESH_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_refresh.grid(row=0, column=2, padx=PADX, pady=PADY)
 
         # Carregar dados na tabela de pagamentos
         self.load_data()
@@ -244,54 +266,55 @@ class ClientCRUD:
         self.top.title("Gerenciar Clientes")
         self.top.geometry("600x400")
         self.top.resizable(False, False)
+        self.top.configure(bg=WINDOW_BG_COLOR)
 
         self.sort_order = {}  # Dictionary to keep track of sort order for each column
 
-        self.frame_inputs = tk.Frame(self.top)
-        self.frame_inputs.pack(pady=20)
+        self.frame_inputs = tk.Frame(self.top, bg=WINDOW_BG_COLOR)
+        self.frame_inputs.pack(pady=FRAME_PADY)
 
         # Campos de entrada para cliente
-        self.label_name = tk.Label(self.frame_inputs, text="Nome do Cliente", font=("Arial", 12))
-        self.label_name.grid(row=0, column=0, padx=10, pady=10)
-        self.entry_name = tk.Entry(self.frame_inputs, width=30, font=("Arial", 12))
-        self.entry_name.grid(row=0, column=1, padx=10, pady=10)
+        self.label_name = tk.Label(self.frame_inputs, text="Nome do Cliente", font=FONT, bg=WINDOW_BG_COLOR)
+        self.label_name.grid(row=0, column=0, padx=PADX, pady=PADY)
+        self.entry_name = tk.Entry(self.frame_inputs, width=30, font=FONT)
+        self.entry_name.grid(row=0, column=1, padx=PADX, pady=PADY)
 
         # Botão para filtrar por cliente ao lado do campo de entrada
-        self.button_filter = tk.Button(self.frame_inputs, text="Buscar", command=self.filter_by_client, font=("Arial", 12))
-        self.button_filter.grid(row=0, column=2, padx=10, pady=10)
+        self.button_filter = tk.Button(self.frame_inputs, text="Buscar", command=self.filter_by_client, font=FONT, bg=FILTER_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_filter.grid(row=0, column=2, padx=PADX, pady=PADY)
 
-        self.label_phone = tk.Label(self.frame_inputs, text="Telefone", font=("Arial", 12))
-        self.label_phone.grid(row=1, column=0, padx=10, pady=10)
-        self.entry_phone = tk.Entry(self.frame_inputs, width=30, fg='gray', validate="key", validatecommand=(self.top.register(self.validate_phone), '%P'), font=("Arial", 12))
+        self.label_phone = tk.Label(self.frame_inputs, text="Telefone", font=FONT, bg=WINDOW_BG_COLOR)
+        self.label_phone.grid(row=1, column=0, padx=PADX, pady=PADY)
+        self.entry_phone = tk.Entry(self.frame_inputs, width=30, fg='gray', validate="key", validatecommand=(self.top.register(self.validate_phone), '%P'), font=FONT)
         self.entry_phone.insert(0, "(XX)XXXXX-XXXX")
-        self.entry_phone.grid(row=1, column=1, padx=10, pady=10)
+        self.entry_phone.grid(row=1, column=1, padx=PADX, pady=PADY)
         self.entry_phone.bind("<FocusIn>", self.on_focus_in)
         self.entry_phone.bind("<FocusOut>", self.on_focus_out)
         self.entry_phone.bind("<KeyRelease>", self.format_phone_number)
 
         # Botões de CRUD
-        self.frame_buttons = tk.Frame(self.top)
-        self.frame_buttons.pack(pady=5)
+        self.frame_buttons = tk.Frame(self.top, bg=WINDOW_BG_COLOR)
+        self.frame_buttons.pack(pady=PADY)
 
-        self.button_add = tk.Button(self.frame_buttons, text="Adicionar Cliente", command=self.add_client, font=("Arial", 12))
-        self.button_add.grid(row=0, column=0, padx=5)
+        self.button_add = tk.Button(self.frame_buttons, text="Adicionar Cliente", command=self.add_client, font=FONT, bg=ADD_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_add.grid(row=0, column=0, padx=PADX)
 
-        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Clientes", command=self.delete_clients, font=("Arial", 12))
-        self.button_delete.grid(row=0, column=1, padx=5)
+        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Clientes", command=self.delete_clients, font=FONT, bg=DELETE_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_delete.grid(row=0, column=1, padx=PADX)
 
-        self.button_edit_name = tk.Button(self.frame_buttons, text="Alterar Nome", command=self.edit_client_name, font=("Arial", 12))
-        self.button_edit_name.grid(row=0, column=2, padx=5)
+        self.button_edit_name = tk.Button(self.frame_buttons, text="Alterar Nome", command=self.edit_client_name, font=FONT, bg=EDIT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_edit_name.grid(row=0, column=2, padx=PADX)
 
-        self.button_edit_phone = tk.Button(self.frame_buttons, text="Alterar Telefone", command=self.edit_client_phone, font=("Arial", 12))
-        self.button_edit_phone.grid(row=0, column=3, padx=5)
+        self.button_edit_phone = tk.Button(self.frame_buttons, text="Alterar Telefone", command=self.edit_client_phone, font=FONT, bg=EDIT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_edit_phone.grid(row=0, column=3, padx=PADX)
 
         # Botão para atualizar lista
-        self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_clients, font=("Arial", 12))
-        self.button_refresh.pack(pady=5)
+        self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_clients, font=FONT, bg=FILTER_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_refresh.pack(pady=PADY)
 
         # Tabela de clientes
-        self.client_table_frame = tk.Frame(self.top)
-        self.client_table_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.client_table_frame = tk.Frame(self.top, bg=WINDOW_BG_COLOR)
+        self.client_table_frame.pack(fill='both', expand=True, padx=PADX, pady=PADY)
 
         self.client_table_canvas = tk.Canvas(self.client_table_frame)
         self.client_table_canvas.grid(row=0, column=0)
@@ -383,6 +406,12 @@ class ClientCRUD:
         if not name or not phone or len(phone) < 10 or len(phone) > 14:
             self.show_messagebox("Erro", "Telefone Inválido. Preencha todos os campos corretamente.")
             return
+
+        existing_client = supabase.table("clients").select("*").eq("name", name).execute().data
+        if existing_client:
+            if not messagebox.askyesno("Cliente Existente", "O cliente já existe. Deseja continuar?"):
+                self.top.lift()
+                return
 
         data = {"name": name, "phone": phone}
         supabase.table("clients").insert(data).execute()
@@ -490,51 +519,51 @@ class PaymentCRUD:
         self.frame_inputs.pack(pady=20)
 
         # Campos de entrada para pagamento
-        self.label_amount = tk.Label(self.frame_inputs, text="Valor", font=("Arial", 12))
+        self.label_amount = tk.Label(self.frame_inputs, text="Valor", font=FONT)
         self.label_amount.grid(row=0, column=0, padx=10, pady=10)
-        self.entry_amount = tk.Entry(self.frame_inputs, width=30, validate="key", validatecommand=(self.top.register(self.validate_amount), '%P'), font=("Arial", 12))
+        self.entry_amount = tk.Entry(self.frame_inputs, width=30, validate="key", validatecommand=(self.top.register(self.validate_amount), '%P'), font=FONT)
         self.entry_amount.grid(row=0, column=1, padx=10, pady=10)
 
-        self.label_due_date = tk.Label(self.frame_inputs, text="Data de Vencimento", font=("Arial", 12))
+        self.label_due_date = tk.Label(self.frame_inputs, text="Data de Vencimento", font=FONT)
         self.label_due_date.grid(row=1, column=0, padx=10, pady=10)
-        self.entry_due_date = DateEntry(self.frame_inputs, width=30, background='darkblue', foreground='white', borderwidth=2, locale='pt_BR', font=("Arial", 12))
+        self.entry_due_date = DateEntry(self.frame_inputs, width=30, background='darkblue', foreground='white', borderwidth=2, locale='pt_BR', font=FONT)
         self.entry_due_date.grid(row=1, column=1, padx=10, pady=10)
 
-        self.label_client = tk.Label(self.frame_inputs, text="Cliente", font=("Arial", 12))
+        self.label_client = tk.Label(self.frame_inputs, text="Cliente", font=FONT)
         self.label_client.grid(row=2, column=0, padx=10, pady=10)
         self.client_names = self.load_client_names()
-        self.combobox_client = ttk.Combobox(self.frame_inputs, values=self.client_names, width=28, font=("Arial", 12))
+        self.combobox_client = ttk.Combobox(self.frame_inputs, values=self.client_names, width=28, font=FONT)
         self.combobox_client.grid(row=2, column=1, padx=10, pady=10)
         self.combobox_client.bind("<KeyRelease>", self.filter_items)
 
         # Botão para filtrar por cliente usando a combobox existente
-        self.button_filter = tk.Button(self.frame_inputs, text="Filtrar por Cliente", command=self.filter_by_client, font=("Arial", 12))
+        self.button_filter = tk.Button(self.frame_inputs, text="Filtrar por Cliente", command=self.filter_by_client, font=FONT, bg=FILTER_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_filter.grid(row=2, column=2, padx=10, pady=10)
 
         # Botões de CRUD
         self.frame_buttons = tk.Frame(self.top)
         self.frame_buttons.pack(pady=5)
 
-        self.button_add = tk.Button(self.frame_buttons, text="Adicionar Pagamento", command=self.add_payment, font=("Arial", 12))
+        self.button_add = tk.Button(self.frame_buttons, text="Adicionar Pagamento", command=self.add_payment, font=FONT, bg=ADD_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_add.grid(row=0, column=0, padx=5)
 
-        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()], font=("Arial", 12))
+        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()], font=FONT, bg=DELETE_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_delete.grid(row=0, column=1, padx=5)
 
-        self.button_edit_client = tk.Button(self.frame_buttons, text="Alterar Cliente", command=self.edit_client, font=("Arial", 12))
+        self.button_edit_client = tk.Button(self.frame_buttons, text="Alterar Cliente", command=self.edit_client, font=FONT, bg=EDIT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_edit_client.grid(row=0, column=2, padx=5)
 
-        self.button_edit = tk.Button(self.frame_buttons, text="Alterar Valor", command=self.edit_payment, font=("Arial", 12))
+        self.button_edit = tk.Button(self.frame_buttons, text="Alterar Valor", command=self.edit_payment, font=FONT, bg=EDIT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_edit.grid(row=0, column=3, padx=5)
 
-        self.button_edit_due_date = tk.Button(self.frame_buttons, text="Alterar Data", command=self.edit_due_date, font=("Arial", 12))
+        self.button_edit_due_date = tk.Button(self.frame_buttons, text="Alterar Data", command=self.edit_due_date, font=FONT, bg=EDIT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_edit_due_date.grid(row=0, column=4, padx=5)
 
-        self.button_change_status = tk.Button(self.frame_buttons, text="Alterar Status", command=self.change_status, font=("Arial", 12))
+        self.button_change_status = tk.Button(self.frame_buttons, text="Alterar Status", command=self.change_status, font=FONT, bg=EDIT_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_change_status.grid(row=0, column=5, padx=5)
 
         # Botão para atualizar lista
-        self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_payments, font=("Arial", 12))
+        self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_payments, font=FONT, bg=FILTER_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_refresh.pack(pady=5)
 
         # Tabela de pagamentos
@@ -573,7 +602,7 @@ class PaymentCRUD:
 
         # Botão para esconder/mostrar pagamentos quitados
         self.show_paid_var = tk.BooleanVar(value=True)
-        self.button_toggle_paid = tk.Button(self.top, text="Esconder Pagamentos Quitados", command=self.toggle_paid, font=("Arial", 12))
+        self.button_toggle_paid = tk.Button(self.top, text="Esconder Pagamentos Quitados", command=self.toggle_paid, font=FONT, bg=TOGGLE_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_toggle_paid.pack(pady=5)
 
         self.load_payments()
