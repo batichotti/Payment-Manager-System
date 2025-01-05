@@ -276,10 +276,10 @@ class ClientCRUD:
         self.button_add = tk.Button(self.frame_buttons, text="Adicionar Cliente", command=self.add_client)
         self.button_add.grid(row=0, column=0, padx=5)
 
-        self.button_edit_name = tk.Button(self.frame_buttons, text="Editar Nome", command=self.edit_client_name)
+        self.button_edit_name = tk.Button(self.frame_buttons, text="Alterar Nome", command=self.edit_client_name)
         self.button_edit_name.grid(row=0, column=1, padx=5)
 
-        self.button_edit_phone = tk.Button(self.frame_buttons, text="Editar Telefone", command=self.edit_client_phone)
+        self.button_edit_phone = tk.Button(self.frame_buttons, text="Alterar Telefone", command=self.edit_client_phone)
         self.button_edit_phone.grid(row=0, column=2, padx=5)
 
         self.button_delete = tk.Button(self.frame_buttons, text="Excluir Clientes", command=self.delete_clients)
@@ -382,7 +382,7 @@ class ClientCRUD:
         """Editar nome do cliente selecionado"""
         selected_items = self.client_table.selection()
         if len(selected_items) != 1:
-            self.show_messagebox("Erro", "Selecione apenas um cliente para editar.")
+            self.show_messagebox("Erro", "Selecione exatamente um cliente para editar.")
             return
         
         selected_item = selected_items[0]
@@ -400,7 +400,7 @@ class ClientCRUD:
         """Editar telefone do cliente selecionado"""
         selected_items = self.client_table.selection()
         if len(selected_items) != 1:
-            self.show_messagebox("Erro", "Selecione apenas um cliente para editar.")
+            self.show_messagebox("Erro", "Selecione exatamente um cliente para editar.")
             return
         
         selected_item = selected_items[0]
@@ -434,14 +434,13 @@ class ClientCRUD:
     def on_select(self, event):
         """Ação ao selecionar um cliente"""
         selected_items = self.client_table.selection()
-        if selected_items:
+        if len(selected_items) == 1:
             self.button_edit_name.config(state="normal")
             self.button_edit_phone.config(state="normal")
             self.button_delete.config(state="normal")
         else:
             self.button_edit_name.config(state="disabled")
             self.button_edit_phone.config(state="disabled")
-            self.button_delete.config(state="disabled")
 
     def filter_by_client(self):
         """Filtrar clientes por nome similar"""
@@ -505,17 +504,17 @@ class PaymentCRUD:
         self.button_add = tk.Button(self.frame_buttons, text="Adicionar Pagamento", command=self.add_payment)
         self.button_add.grid(row=0, column=0, padx=5)
 
-        self.button_edit = tk.Button(self.frame_buttons, text="Alterar Valor", command=self.edit_payment)
-        self.button_edit.grid(row=0, column=1, padx=5)
+        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()])
+        self.button_delete.grid(row=0, column=4, padx=5)
 
         self.button_edit_client = tk.Button(self.frame_buttons, text="Alterar Cliente", command=self.edit_client)
         self.button_edit_client.grid(row=0, column=2, padx=5)
 
+        self.button_edit = tk.Button(self.frame_buttons, text="Alterar Valor", command=self.edit_payment)
+        self.button_edit.grid(row=0, column=1, padx=5)
+
         self.button_edit_due_date = tk.Button(self.frame_buttons, text="Alterar Data", command=self.edit_due_date)
         self.button_edit_due_date.grid(row=0, column=3, padx=5)
-
-        self.button_delete = tk.Button(self.frame_buttons, text="Excluir Pagamentos", command=lambda: [self.delete_payments(), root.lift()])
-        self.button_delete.grid(row=0, column=4, padx=5)
 
         self.button_change_status = tk.Button(self.frame_buttons, text="Alterar Status", command=self.change_status)
         self.button_change_status.grid(row=0, column=5, padx=5)
@@ -617,7 +616,7 @@ class PaymentCRUD:
 
         for payment in payments.data:
             client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
-            status = "Pago" if payment['is_paid'] else "Pendente"
+            status = "Quitado" if payment['is_paid'] else "Pendente"
             
             # Verificar e formatar a data de vencimento, se necessário
             try:
@@ -659,8 +658,8 @@ class PaymentCRUD:
     def edit_payment(self):
         """Editar valor do pagamento selecionado"""
         selected_items = self.payment_table.selection()
-        if not selected_items:
-            self.show_messagebox("Erro", "Selecione um pagamento para editar.")
+        if len(selected_items) != 1:
+            self.show_messagebox("Erro", "Selecione exatamente um pagamento para editar.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
@@ -678,8 +677,8 @@ class PaymentCRUD:
     def edit_client(self):
         """Editar cliente do pagamento selecionado"""
         selected_items = self.payment_table.selection()
-        if not selected_items:
-            self.show_messagebox("Erro", "Selecione um pagamento para editar.")
+        if len(selected_items) != 1:
+            self.show_messagebox("Erro", "Selecione exatamente um pagamento para editar.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
@@ -698,8 +697,8 @@ class PaymentCRUD:
     def edit_due_date(self):
         """Editar data de vencimento do pagamento selecionado"""
         selected_items = self.payment_table.selection()
-        if not selected_items:
-            self.show_messagebox("Erro", "Selecione um pagamento para editar.")
+        if len(selected_items) != 1:
+            self.show_messagebox("Erro", "Selecione exatamente um pagamento para editar.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
@@ -735,15 +734,15 @@ class PaymentCRUD:
     def change_status(self):
         """Alterar o status do pagamento selecionado"""
         selected_items = self.payment_table.selection()
-        if not selected_items:
-            self.show_messagebox("Erro", "Selecione um pagamento para alterar o status.")
+        if len(selected_items) != 1:
+            self.show_messagebox("Erro", "Selecione exatamente um pagamento para alterar o status.")
             return
 
         payment_id = self.payment_table.item(selected_items[0], 'values')[0]
         current_status = self.payment_table.item(selected_items[0], 'values')[4]
 
-        new_status = "Pendente" if current_status == "Pago" else "Pago"
-        is_paid = new_status == "Pago"
+        new_status = "Pendente" if current_status == "Quitado" else "Quitado"
+        is_paid = new_status == "Quitado"
 
         supabase.table("payments").update({"is_paid": is_paid}).eq("id", payment_id).execute()
         self.load_payments()
@@ -751,12 +750,17 @@ class PaymentCRUD:
     def on_select(self, event):
         """Ação ao selecionar um pagamento"""
         selected_items = self.payment_table.selection()
-        if selected_items:
+        if len(selected_items) == 1:
             self.button_edit.config(state="normal")
+            self.button_edit_client.config(state="normal")
+            self.button_edit_due_date.config(state="normal")
             self.button_delete.config(state="normal")
+            self.button_change_status.config(state="normal")
         else:
             self.button_edit.config(state="disabled")
-            self.button_delete.config(state="disabled")
+            self.button_edit_client.config(state="disabled")
+            self.button_edit_due_date.config(state="disabled")
+            self.button_change_status.config(state="disabled")
 
     def filter_by_client(self):
         """Filtrar pagamentos por cliente"""
@@ -773,7 +777,7 @@ class PaymentCRUD:
 
         for payment in payments.data:
             client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
-            status = "Pago" if payment['is_paid'] else "Pendente"
+            status = "Quitado" if payment['is_paid'] else "Pendente"
             try:
                 due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d").strftime("%d/%m/%Y")
             except ValueError:
