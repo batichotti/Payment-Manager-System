@@ -7,8 +7,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
 import urllib.parse
+import webbrowser
+import time
 
-def send_payment_reminder(payments, method='selenium'):
+def open_whatsapp_web():
+    webbrowser.open("https://web.whatsapp.com")
+    time.sleep(45)
+
+def send_payment_reminder(payments, method='pywhatkit'):
+    if method == 'pywhatkit':
+        open_whatsapp_web()
+    
     for payment in payments:
         client_name = payment['client_name']
         phone = payment['client_phone']
@@ -44,64 +53,14 @@ def send_payment_reminder(payments, method='selenium'):
                 send_with_pywhatkit(phone, message)
             elif method == 'selenium':
                 send_with_selenium(phone, message)
-            elif method == 'wa_link':
-                send_with_wa_link(phone, message)
             elif method == 'print':
                 print_message(phone, message)
 
-def send_with_selenium(phone, message):
-    driver = webdriver.Chrome()
-    driver.get("https://web.whatsapp.com")
-    
-    # Esperar até que o QR code seja escaneado
-    WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CSS_SELECTOR, "canvas[aria-label='Scan me!']")))
-    print("Please scan the QR code to log in to WhatsApp Web.")
-    
-    WebDriverWait(driver, 300).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Search input textbox']")))
-    print("Logged in to WhatsApp Web.")
-    
-    for payment in payments:
-        phone = payment['client_phone']
-        if not phone.startswith("+55"):
-            phone = "+55" + phone
-        message = payment['message']
-        
-        # Navegar para o chat do contato
-        driver.get(f"https://web.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(message)}")
-        
-        # Esperar até que o campo de mensagem esteja presente
-        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true']")))
-        
-        # Enviar a mensagem
-        input_box = driver.find_element(By.CSS_SELECTOR, "div[contenteditable='true']")
-        input_box.send_keys(Keys.ENTER)
-        sleep(5)  # Esperar um pouco para garantir que a mensagem foi enviada
-    
-    driver.quit()
-
 def send_with_pywhatkit(phone, message):
-    kit.sendwhatmsg_instantly(phone, message, wait_time=15, tab_close=True)
+    kit.sendwhatmsg_instantly(phone, message, wait_time=10, tab_close=True)
 
-def send_with_wa_link(phone, message):
-    driver = webdriver.Chrome()
-    driver.get(f"https://wa.me/{phone}?text={urllib.parse.quote(message)}")
-    
-    # Esperar até que o botão de enviar esteja presente
-    WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='send']")))
-    
-    # Clicar no botão de enviar
-    send_button = driver.find_element(By.CSS_SELECTOR, "a[href*='send']")
-    send_button.click()
-    
-    # Esperar até que o campo de mensagem esteja presente
-    WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true']")))
-    
-    # Enviar a mensagem
-    input_box = driver.find_element(By.CSS_SELECTOR, "div[contenteditable='true']")
-    input_box.send_keys(Keys.ENTER)
-    sleep(5)  # Esperar um pouco para garantir que a mensagem foi enviada
-    
-    driver.quit()
+def send_with_selenium(phone, message):
+    pass
 
 def print_message(phone, message):
     print(f"Phone: {phone}")
@@ -128,4 +87,4 @@ if __name__ == "__main__":
             'due_date': '2025-01-05'
         }
     ]
-    send_payment_reminder(payments, method='print')
+    send_payment_reminder(payments)
