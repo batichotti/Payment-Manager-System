@@ -84,7 +84,7 @@ class PaymentApp:
             self.root.destroy()
 
     def sort_table(self, table, column):
-        """Ordenar a tabela com base na coluna clicada"""
+        """Sort the table based on the clicked column"""
         rows = list(table.get_children())
         if column not in self.sort_order:
             self.sort_order[column] = False  # Default to ascending order
@@ -100,7 +100,7 @@ class PaymentApp:
         self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
 
     def load_data(self):
-        """Carregar pagamentos na tabela"""
+        """Load payments into the table"""
         for row in self.table.get_children():
             self.table.delete(row)
 
@@ -110,7 +110,7 @@ class PaymentApp:
         self.display_page(self.current_page)
 
     def display_page(self, page):
-        """Exibir uma página específica de pagamentos na tabela"""
+        """Display a specific page of payments in the table"""
         for payment in self.all_payments:
             client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
             is_paid = "Quitado" if payment['is_paid'] else "Pendente"
@@ -124,40 +124,40 @@ class PaymentApp:
                 self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], amount, due_date, is_paid))
 
     def refresh_data(self):
-        """Atualizar dados da tabela e combobox de clientes"""
+        """Refresh table data and client combobox"""
         self.load_data()
         self.update_client_combobox()
 
     def update_client_combobox(self):
-        """Atualizar os nomes dos clientes na combobox"""
+        """Update client names in the combobox"""
         self.client_names = self.load_client_names()
         self.combobox_client_filter['values'] = self.client_names
 
     def open_client_crud(self):
-        """Abrir a tela de CRUD de clientes"""
+        """Open the client CRUD screen"""
         client_crud = ClientCRUD(self.root, self)
         self.root.wait_window(client_crud.top)
         self.refresh_data()
 
     def open_payment_crud(self):
-        """Abrir a tela de CRUD de pagamentos"""
+        """Open the payment CRUD screen"""
         payment_crud = PaymentCRUD(self.root, self)
         self.root.wait_window(payment_crud.top)
         self.refresh_data()
 
     def load_client_names(self):
-        """Carregar os nomes dos clientes do banco de dados"""
+        """Load client names from the database"""
         clients = supabase.table("clients").select("name").execute().data
         return [client['name'] for client in clients]
 
     def filter_items(self, event):
-        """Filtrar os nomes dos clientes na combobox durante a digitação"""
+        """Filter client names in the combobox while typing"""
         query = self.combobox_client_filter.get().lower()
         filtered_names = [name for name in self.client_names if query in name.lower()]
         self.combobox_client_filter['values'] = filtered_names
 
     def filter_by_client(self):
-        """Filtrar pagamentos por cliente"""
+        """Filter payments by client"""
         client_name = self.combobox_client_filter.get()
         if not client_name:
             messagebox.showerror("Erro", "Selecione um cliente para filtrar.")
@@ -171,7 +171,7 @@ class PaymentApp:
         self.display_page(self.current_page)
 
     def toggle_paid(self):
-        """Alternar a exibição de pagamentos quitados"""
+        """Toggle the display of paid payments"""
         self.show_paid_var.set(not self.show_paid_var.get())
         if self.show_paid_var.get():
             self.button_toggle_paid.config(text="Esconder Pagamentos Quitados")
@@ -180,7 +180,7 @@ class PaymentApp:
         self.refresh_data()
 
     def send_reminder(self):
-        """Enviar cobrança para os clientes selecionados"""
+        """Send reminder to selected clients"""
         selected_items = self.table.selection()
         if not selected_items:
             self.root.lift()
@@ -213,7 +213,7 @@ class PaymentApp:
             messagebox.showinfo("Informação", "Nenhum pagamento pendente selecionado para cobrança.")
 
     def log_backlog(self, description):
-        """Registrar uma nova linha na tabela de backlog"""
+        """Log a new entry in the backlog table"""
         data = {
             "responsible_user": self.user,
             "description": description
@@ -221,6 +221,6 @@ class PaymentApp:
         supabase.table("backlog").insert(data).execute()
 
     def select_all(self, event):
-        """Selecionar todas as linhas da tabela"""
+        """Select all rows in the table"""
         self.table.selection_set(self.table.get_children())
 

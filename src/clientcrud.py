@@ -85,10 +85,11 @@ class ClientCRUD:
         self.load_clients()
 
     def validate_phone(self, new_value):
-        """Validar o valor do campo de entrada para aceitar apenas números e caracteres especiais permitidos"""
+        """Validate the phone input to accept only numbers and allowed special characters"""
         return all(char.isdigit() or char in "X()-+" for char in new_value)
 
     def format_phone_number(self, event):
+        """Format the phone number input"""
         phone_number = self.entry_phone.get()
         phone_number = re.sub(r'\D', '', phone_number)
         if len(phone_number) == 10:
@@ -105,11 +106,13 @@ class ClientCRUD:
         self.entry_phone.insert(0, formatted)
 
     def on_focus_in(self, event):
+        """Handle focus in event for the phone entry"""
         if self.entry_phone.get() == "(XX)XXXXX-XXXX":
             self.entry_phone.delete(0, tk.END)
             self.entry_phone.config(fg='black')
 
     def on_focus_out(self, event):
+        """Handle focus out event for the phone entry"""
         phone_number = re.sub(r'\D', '', self.entry_phone.get())
         if len(phone_number) < 10 or len(phone_number) > 14:
             self.entry_phone.delete(0, tk.END)
@@ -117,7 +120,7 @@ class ClientCRUD:
             self.entry_phone.config(fg='gray')
 
     def sort_table(self, table, column):
-        """Ordenar a tabela com base na coluna clicada"""
+        """Sort the table based on the clicked column"""
         rows = list(table.get_children())
         if column not in self.sort_order:
             self.sort_order[column] = False  # Default to ascending order
@@ -130,7 +133,7 @@ class ClientCRUD:
         self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
 
     def load_clients(self):
-        """Carregar clientes na tabela"""
+        """Load clients into the table"""
         for row in self.client_table.get_children():
             self.client_table.delete(row)
 
@@ -140,12 +143,12 @@ class ClientCRUD:
         self.display_page(self.current_page)
 
     def display_page(self, page):
-        """Exibir uma página específica de clientes na tabela"""
+        """Display a specific page of clients in the table"""
         for client in self.all_clients:
             self.client_table.insert("", "end", values=(client['id'], client['name'], client['phone']))
 
     def add_client(self):
-        """Adicionar cliente"""
+        """Add a client"""
         name = self.entry_name.get()
         phone = re.sub(r'\D', '', self.entry_phone.get())
 
@@ -170,7 +173,7 @@ class ClientCRUD:
         self.app.log_backlog(f"Added client: {name}")
 
     def edit_client_name(self):
-        """Editar nome do cliente selecionado"""
+        """Edit the selected client's name"""
         selected_items = self.client_table.selection()
         if len(selected_items) != 1:
             self.top.lift()
@@ -198,7 +201,7 @@ class ClientCRUD:
         self.app.log_backlog(f"Edited client name: ID {client_id}, from {old_name} to {new_name}")
 
     def edit_client_phone(self):
-        """Editar telefone do cliente selecionado"""
+        """Edit the selected client's phone"""
         selected_items = self.client_table.selection()
         if len(selected_items) != 1:
             self.top.lift()
@@ -220,7 +223,7 @@ class ClientCRUD:
         self.app.log_backlog(f"Edited client phone: ID {client_id}, from {old_phone} to {new_phone}")
 
     def delete_clients(self):
-        """Excluir clientes selecionados"""
+        """Delete selected clients"""
         selected_items = self.client_table.selection()
         if not selected_items:
             self.top.lift()
@@ -246,7 +249,7 @@ class ClientCRUD:
         self.load_clients()
 
     def on_select(self, event):
-        """Ação ao selecionar um cliente"""
+        """Action when selecting a client"""
         selected_items = self.client_table.selection()
         if len(selected_items) == 1:
             self.button_edit_name.config(state="normal")
@@ -257,7 +260,7 @@ class ClientCRUD:
             self.button_edit_phone.config(state="disabled")
 
     def filter_by_client(self):
-        """Filtrar clientes por nome similar sem gerar nova query ao banco de dados"""
+        """Filter clients by similar name without generating a new query to the database"""
         client_name = self.entry_name.get().lower()
         if not client_name:
             self.top.lift()
@@ -268,7 +271,7 @@ class ClientCRUD:
         self.display_filtered_clients(filtered_clients)
 
     def display_filtered_clients(self, filtered_clients):
-        """Exibir clientes filtrados na tabela"""
+        """Display filtered clients in the table"""
         for row in self.client_table.get_children():
             self.client_table.delete(row)
         for client in filtered_clients:

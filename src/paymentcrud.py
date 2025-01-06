@@ -105,7 +105,7 @@ class PaymentCRUD:
         self.load_payments()
 
     def validate_amount(self, new_value):
-        """Validar o valor do campo de entrada para aceitar apenas números e até duas casas decimais"""
+        """Validate the amount input to accept only numbers and up to two decimal places"""
         if not new_value:
             return True
         try:
@@ -121,18 +121,18 @@ class PaymentCRUD:
             return False
 
     def load_client_names(self):
-        """Carregar os nomes dos clientes do banco de dados"""
+        """Load client names from the database"""
         clients = supabase.table("clients").select("name").execute().data
         return [client['name'] for client in clients]
 
     def filter_items(self, event):
-        """Filtrar os nomes dos clientes na combobox durante a digitação"""
+        """Filter client names in the combobox while typing"""
         query = self.combobox_client.get().lower()
         filtered_names = [name for name in self.client_names if query in name.lower()]
         self.combobox_client['values'] = filtered_names
 
     def sort_table(self, table, column):
-        """Ordenar a tabela com base na coluna clicada"""
+        """Sort the table based on the clicked column"""
         rows = list(table.get_children())
         if column not in self.sort_order:
             self.sort_order[column] = False  # Default to ascending order
@@ -148,7 +148,7 @@ class PaymentCRUD:
         self.sort_order[column] = not self.sort_order[column]  # Toggle sort order for next click
 
     def load_payments(self):
-        """Carregar pagamentos na tabela"""
+        """Load payments into the table"""
         for row in self.payment_table.get_children():
             self.payment_table.delete(row)
 
@@ -158,7 +158,7 @@ class PaymentCRUD:
         self.display_page(self.current_page)
 
     def display_page(self, page):
-        """Exibir uma página específica de pagamentos na tabela"""
+        """Display a specific page of payments in the table"""
         for payment in self.all_payments:
             client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
             status = "Quitado" if payment['is_paid'] else "Pendente"
@@ -172,7 +172,7 @@ class PaymentCRUD:
                 self.payment_table.insert("", "end", values=(payment['id'], client['name'], amount, due_date, status))
 
     def add_payment(self):
-        """Adicionar pagamento"""
+        """Add a payment"""
         amount = self.entry_amount.get().replace(',', '.')
         due_date = self.entry_due_date.get_date()
         client_name = self.combobox_client.get()
@@ -196,7 +196,7 @@ class PaymentCRUD:
         self.app.log_backlog(f"Added payment: Amount {amount} for client ID {client_id}")
 
     def edit_payment(self):
-        """Editar valor do pagamento selecionado"""
+        """Edit the selected payment amount"""
         selected_items = self.payment_table.selection()
         if len(selected_items) != 1:
             self.top.lift()
@@ -219,7 +219,7 @@ class PaymentCRUD:
         self.app.log_backlog(f"Edited payment: ID {payment_id}, from {old_amount} to {amount}")
 
     def edit_client(self):
-        """Editar cliente do pagamento selecionado"""
+        """Edit the client of the selected payment"""
         selected_items = self.payment_table.selection()
         if len(selected_items) != 1:
             self.top.lift()
@@ -245,7 +245,7 @@ class PaymentCRUD:
         self.app.log_backlog(f"Edited payment client: ID {payment_id}, from {old_client_name} (ID {old_client_id}) to {new_client_name} (ID {client_id})")
 
     def edit_due_date(self):
-        """Editar data de vencimento do pagamento selecionado"""
+        """Edit the due date of the selected payment"""
         selected_items = self.payment_table.selection()
         if len(selected_items) != 1:
             self.top.lift()
@@ -269,7 +269,7 @@ class PaymentCRUD:
         self.app.log_backlog(f"Edited payment due date: ID {payment_id}, from {old_due_date} to {due_date_str}")
 
     def delete_payments(self):
-        """Excluir pagamentos selecionados"""
+        """Delete selected payments"""
         selected_items = self.payment_table.selection()
         if not selected_items:
             self.top.lift()
@@ -290,7 +290,7 @@ class PaymentCRUD:
         self.load_payments()
 
     def change_status(self):
-        """Alterar o status do pagamento selecionado"""
+        """Change the status of the selected payment"""
         selected_items = self.payment_table.selection()
         if len(selected_items) != 1:
             self.top.lift()
@@ -308,7 +308,7 @@ class PaymentCRUD:
         self.app.log_backlog(f"Changed payment status: ID {payment_id}, from {current_status} to {new_status}")
 
     def on_select(self, event):
-        """Ação ao selecionar um pagamento"""
+        """Action when selecting a payment"""
         selected_items = self.payment_table.selection()
         if len(selected_items) == 1:
             self.button_edit.config(state="normal")
@@ -323,7 +323,7 @@ class PaymentCRUD:
             self.button_change_status.config(state="disabled")
 
     def filter_by_client(self):
-        """Filtrar pagamentos por cliente"""
+        """Filter payments by client"""
         client_name = self.combobox_client.get()
         if not client_name:
             self.top.lift()
@@ -338,7 +338,7 @@ class PaymentCRUD:
         self.display_page(self.current_page)
 
     def toggle_paid(self):
-        """Alternar a exibição de pagamentos quitados"""
+        """Toggle the display of paid payments"""
         self.show_paid_var.set(not self.show_paid_var.get())
         if self.show_paid_var.get():
             self.button_toggle_paid.config(text="Esconder Pagamentos Quitados")
@@ -347,7 +347,7 @@ class PaymentCRUD:
         self.load_payments()
 
     def select_all(self, event):
-        """Selecionar todas as linhas da tabela"""
+        """Select all rows in the table"""
         self.payment_table.selection_set(self.payment_table.get_children())
 
     def show_messagebox(self, title, message, icon=messagebox.ERROR):
