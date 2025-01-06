@@ -15,6 +15,7 @@ BOTTOM_FRAME_PADY = 10
 BUTTON_BG_COLOR = "#f0f0f0"
 BUTTON_FG_COLOR = "#000000"
 WINDOW_BG_COLOR = "#ffffff"
+FRAME_BG_COLOR = "#ffffff"
 
 # Window sizes and resizable settings
 MAIN_WINDOW_SIZE = "1400x600"

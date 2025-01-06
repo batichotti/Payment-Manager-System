@@ -4,10 +4,6 @@ from time import sleep
 import webbrowser
 import time
 
-def open_whatsapp_web():
-    webbrowser.open("https://web.whatsapp.com")
-    time.sleep(45)
-
 def send_payment_reminder(payments, method='pywhatkit'):
     if method == 'pywhatkit':
         open_whatsapp_web()
@@ -51,6 +47,10 @@ def send_payment_reminder(payments, method='pywhatkit'):
                 send_with_wa_link(phone, message)
             elif method == 'print':
                 print_message(phone, message)
+
+def open_whatsapp_web():
+    webbrowser.open("https://web.whatsapp.com")
+    time.sleep(45)
 
 def send_with_pywhatkit(phone, message):
     kit.sendwhatmsg_instantly(phone, message, wait_time=10, tab_close=True)
