@@ -164,13 +164,14 @@ class ClientCRUD:
                 return
 
         data = {"name": name, "phone": phone}
-        supabase.table("clients").insert(data).execute()
+        response = supabase.table("clients").insert(data).execute()
+        client_id = response.data[0]['id']
 
         self.entry_name.delete(0, tk.END)
         self.entry_phone.delete(0, tk.END)
 
         self.load_clients()
-        self.app.log_backlog(f"Added client: {name}")
+        self.app.log_backlog(f"Added client: {name} with ID {client_id}")
 
     def edit_client_name(self):
         """Edit the selected client's name"""
@@ -272,8 +273,7 @@ class ClientCRUD:
 
     def display_filtered_clients(self, filtered_clients):
         """Display filtered clients in the table"""
-        for row in self.client_table.get_children():
-            self.client_table.delete(row)
+        self.client_table.delete(*self.client_table.get_children())
         for client in filtered_clients:
             self.client_table.insert("", "end", values=(client['id'], client['name'], client['phone']))
 

@@ -3,7 +3,7 @@ from os import getlogin
 from platform import system, version, processor
 from socket import gethostname
 from tkinter import ttk, messagebox
-from datetime import datetime
+from datetime import datetime, timedelta
 from send_reminder import send_payment_reminder
 from supabase_client import supabase
 from layout_config import *
@@ -41,6 +41,10 @@ class PaymentApp:
         self.show_paid_var = tk.BooleanVar(value=True)
         self.button_toggle_paid = tk.Button(self.filter_frame, text="Esconder Pagamentos Quitados", command=self.toggle_paid, font=FONT, bg=TOGGLE_PAID_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_toggle_paid.grid(row=0, column=3, padx=PADX, pady=PADY)
+
+        self.reminder_within_32_days_var = tk.BooleanVar(value=False)
+        self.checkbox_reminder_within_32_days = tk.Checkbutton(self.filter_frame, text="Cobranças até 1 mês", variable=self.reminder_within_32_days_var, bg=FRAME_BG_COLOR, font=FONT)
+        self.checkbox_reminder_within_32_days.grid(row=0, column=4, padx=PADX, pady=PADY)
 
         self.table_frame = tk.Frame(self.root, bg=FRAME_BG_COLOR)
         self.table_frame.pack(fill='both', expand=True, padx=PADX, pady=FRAME_PADY)
@@ -166,11 +170,21 @@ class PaymentApp:
             messagebox.showerror("Erro", "Selecione um cliente para filtrar.")
             return
 
-        client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
+        client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data
+        if not client_id:
+            messagebox.showerror("Erro", "Cliente não encontrado.")
+            return
+
+        client_id = client_id[0]['id']
         payments = supabase.table("payments").select("*").eq("client_id", client_id).execute()
 
         self.all_payments = payments.data
         self.current_page = 0
+        
+        # Clear the table before displaying filtered payments
+        for row in self.table.get_children():
+            self.table.delete(row)
+        
         self.display_page(self.current_page)
 
     def toggle_paid(self):
@@ -196,6 +210,12 @@ class PaymentApp:
             payment = supabase.table("payments").select("*").eq("id", payment_id).execute().data[0]
             if payment['is_paid']:
                 continue
+
+            if self.reminder_within_32_days_var.get():
+                due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d")
+                if due_date > datetime.now() + timedelta(days=32):
+                    continue
+
             client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
             
             payment_details = {
@@ -210,20 +230,17 @@ class PaymentApp:
             send_payment_reminder(payments, method='pywhatkit')
             self.root.lift()
             messagebox.showinfo("Sucesso", "Cobranças enviadas com sucesso.")
-            for payment in payments:
-                self.log_backlog(f"Sent reminder for payment", payment['client_name'], payment['amount'])
+            self.log_backlog(f"Sent reminder for payments: {[payment['client_name'] for payment in payments]}")
         else:
             self.root.lift()
             messagebox.showinfo("Informação", "Nenhum pagamento pendente selecionado para cobrança.")
 
-    def log_backlog(self, description, client_name=None, amount=None):
+    def log_backlog(self, description):
         """Log a new entry in the backlog table"""
         data = {
             "responsible_user": self.user,
             "description": description
         }
-        if client_name and amount:
-            data["description"] += f" | Cliente: {client_name}, Valor: {amount}"
         supabase.table("backlog").insert(data).execute()
 
     def select_all(self, event):

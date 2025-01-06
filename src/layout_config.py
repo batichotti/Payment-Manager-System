@@ -1,17 +1,21 @@
-# Estética
+"""
+Configuration for the layout and styling of the Payment Manager System application.
+"""
+
+# Font settings
 FONT_NAME = "Arial"
 FONT_SIZE = 12
 FONT = (FONT_NAME, FONT_SIZE)
 TREEVIEW_FONT_SIZE = 14
 TREEVIEW_FONT = (FONT_NAME, TREEVIEW_FONT_SIZE)
 
-# Padding
+# Padding settings
 PADX = 10
 PADY = 10
 FRAME_PADY = 20
 BOTTOM_FRAME_PADY = 10
 
-# Colors
+# Color settings
 BUTTON_BG_COLOR = "#f0f0f0"
 BUTTON_FG_COLOR = "#000000"
 WINDOW_BG_COLOR = "#ffffff"

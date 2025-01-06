@@ -182,7 +182,13 @@ class PaymentCRUD:
             self.show_messagebox("Erro", "Preencha todos os campos.")
             return
 
-        client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
+        client_id_data = supabase.table("clients").select("id").eq("name", client_name).execute().data
+        if not client_id_data:
+            self.top.lift()
+            self.show_messagebox("Erro", "Cliente não encontrado.")
+            return
+
+        client_id = client_id_data[0]['id']
         due_date_str = due_date.strftime("%Y-%m-%d")
 
         data = {"amount": float(amount), "due_date": due_date_str, "client_id": client_id, "is_paid": False}
@@ -282,11 +288,12 @@ class PaymentCRUD:
 
         for selected_item in selected_items:
             payment_id = self.payment_table.item(selected_item, 'values')[0]
-            client_id = self.payment_table.item(selected_item, 'values')[1]
-            client_name = supabase.table("clients").select("name").eq("id", client_id).execute().data[0]['name']
+            client_name = self.payment_table.item(selected_item, 'values')[1]
+            client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
             supabase.table("payments").delete().eq("id", payment_id).execute()
             self.app.log_backlog(f"Deleted payment: ID {payment_id} for client {client_name} (ID {client_id})")
 
+        self.top.lift()
         self.load_payments()
 
     def change_status(self):
@@ -330,12 +337,32 @@ class PaymentCRUD:
             self.show_messagebox("Erro", "Selecione um cliente para filtrar.")
             return
 
-        client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
+        client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data
+        if not client_id:
+            self.top.lift()
+            self.show_messagebox("Erro", "Cliente não encontrado.")
+            return
+
+        client_id = client_id[0]['id']
         payments = supabase.table("payments").select("*").eq("client_id", client_id).execute()
 
         self.all_payments = payments.data
-        self.current_page = 0
-        self.display_page(self.current_page)
+        self.display_filtered_payments(self.all_payments)
+
+    def display_filtered_payments(self, filtered_payments):
+        """Display filtered payments in the table"""
+        self.payment_table.delete(*self.payment_table.get_children())
+        for payment in filtered_payments:
+            client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
+            status = "Quitado" if payment['is_paid'] else "Pendente"
+            try:
+                due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d").strftime("%d/%m/%Y")
+            except ValueError:
+                due_date = "Data inválida"
+            amount = f"{float(payment['amount']):.2f}".replace('.', ',')
+
+            if self.show_paid_var.get() or not payment['is_paid']:
+                self.payment_table.insert("", "end", values=(payment['id'], client['name'], amount, due_date, status))
 
     def toggle_paid(self):
         """Toggle the display of paid payments"""
