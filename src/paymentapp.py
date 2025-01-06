@@ -210,17 +210,20 @@ class PaymentApp:
             send_payment_reminder(payments, method='pywhatkit')
             self.root.lift()
             messagebox.showinfo("Sucesso", "Cobranças enviadas com sucesso.")
-            self.log_backlog(f"Sent reminder for payments: {[payment['client_name'] for payment in payments]}")
+            for payment in payments:
+                self.log_backlog(f"Sent reminder for payment", payment['client_name'], payment['amount'])
         else:
             self.root.lift()
             messagebox.showinfo("Informação", "Nenhum pagamento pendente selecionado para cobrança.")
 
-    def log_backlog(self, description):
+    def log_backlog(self, description, client_name=None, amount=None):
         """Log a new entry in the backlog table"""
         data = {
             "responsible_user": self.user,
             "description": description
         }
+        if client_name and amount:
+            data["description"] += f" | Cliente: {client_name}, Valor: {amount}"
         supabase.table("backlog").insert(data).execute()
 
     def select_all(self, event):

@@ -193,7 +193,7 @@ class PaymentCRUD:
         self.combobox_client.set('')
 
         self.load_payments()
-        self.app.log_backlog(f"Added payment: Amount {amount} for client ID {client_id}")
+        self.app.log_backlog(f"Added payment: Amount {amount} for client ID {client_id} ({client_name})")
 
     def edit_payment(self):
         """Edit the selected payment amount"""
