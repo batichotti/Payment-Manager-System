@@ -1,10 +1,5 @@
-import re
-from os import getlogin
-from platform import system, version, processor
-from socket import gethostname
 import tkinter as tk
 from tkinter import ttk, messagebox
-from tkcalendar import DateEntry
 from datetime import datetime
 from send_reminder import send_payment_reminder
 from supabase_client import supabase
@@ -78,6 +73,7 @@ class PaymentApp:
         self.load_data()
         self.sort_order = {}
         self.user = f"""{getlogin()}@{gethostname()} - {system()} : {version()} - {processor()}"""
+        self.root.bind('<Control-a>', self.select_all)
 
     def on_closing(self):
         """Handle the closing of the main window"""
@@ -223,4 +219,8 @@ class PaymentApp:
             "description": description
         }
         supabase.table("backlog").insert(data).execute()
+
+    def select_all(self, event):
+        """Selecionar todas as linhas da tabela"""
+        self.table.selection_set(self.table.get_children())
 

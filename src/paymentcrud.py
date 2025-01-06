@@ -1,12 +1,8 @@
 import re
-from os import getlogin
-from platform import system, version, processor
-from socket import gethostname
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 from datetime import datetime
-from send_reminder import send_payment_reminder
 from supabase_client import supabase
 from layout_config import *
 
@@ -103,6 +99,8 @@ class PaymentCRUD:
         self.show_paid_var = tk.BooleanVar(value=True)
         self.button_toggle_paid = tk.Button(self.top, text="Esconder Pagamentos Quitados", command=self.toggle_paid, font=FONT, bg=TOGGLE_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_toggle_paid.pack(pady=5)
+
+        self.top.bind('<Control-a>', self.select_all)
 
         self.load_payments()
 
@@ -347,6 +345,10 @@ class PaymentCRUD:
         else:
             self.button_toggle_paid.config(text="Mostrar Pagamentos Quitados")
         self.load_payments()
+
+    def select_all(self, event):
+        """Selecionar todas as linhas da tabela"""
+        self.payment_table.selection_set(self.payment_table.get_children())
 
     def show_messagebox(self, title, message, icon=messagebox.ERROR):
         """Show a messagebox and keep the CRUD window in front"""
