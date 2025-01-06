@@ -1,0 +1,4 @@
+tkcalendar==1.6.1
+python-dotenv==0.19.2
+supabase==0.1.5
+pywhatkit==5.2
