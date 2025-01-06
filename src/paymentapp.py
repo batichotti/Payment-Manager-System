@@ -1,4 +1,7 @@
 import tkinter as tk
+from os import getlogin
+from platform import system, version, processor
+from socket import gethostname
 from tkinter import ttk, messagebox
 from datetime import datetime
 from send_reminder import send_payment_reminder
