@@ -5,50 +5,21 @@ from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 from datetime import datetime
 from send_reminder import send_payment_reminder
-from supabase_client import supabase 
-
-# Estética
-FONT_NAME = "Arial"
-FONT_SIZE = 12
-FONT = (FONT_NAME, FONT_SIZE)
-TREEVIEW_FONT_SIZE = 14
-TREEVIEW_FONT = (FONT_NAME, TREEVIEW_FONT_SIZE)
-
-# Padding
-PADX = 10
-PADY = 10
-FRAME_PADY = 20
-BOTTOM_FRAME_PADY = 10
-
-# Colors
-BUTTON_BG_COLOR = "#f0f0f0"
-BUTTON_FG_COLOR = "#000000"
-WINDOW_BG_COLOR = "#ffffff"
-
-# Button styles
-ADD_BUTTON_BG_COLOR = "#d4edda"
-DELETE_BUTTON_BG_COLOR = "#f8d7da"
-EDIT_BUTTON_BG_COLOR = "#fff3cd"
-FILTER_BUTTON_BG_COLOR = "#d1ecf1"
-TOGGLE_BUTTON_BG_COLOR = "#cce5ff"
-SEND_REMINDER_BUTTON_BG_COLOR = "#d1ecf1"
-FILTER_CLIENT_BUTTON_BG_COLOR = "#d1ecf1"
-TOGGLE_PAID_BUTTON_BG_COLOR = "#cce5ff"
-CLIENT_CRUD_BUTTON_BG_COLOR = "#d1ecf1"
-PAYMENT_CRUD_BUTTON_BG_COLOR = "#d1ecf1"
-REFRESH_BUTTON_BG_COLOR = "#d1ecf1"
-
+from supabase_client import supabase
+from layout_config import *
 
 class PaymentApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Sistema de Pagamentos")
-        self.root.geometry("1400x600")  # Define a geometria fixa
-        self.root.resizable(False, False)  # Impede o redimensionamento da janela
+        self.root.geometry(MAIN_WINDOW_SIZE)  # Define a geometria fixa
+        self.root.resizable(*MAIN_WINDOW_RESIZABLE)  # Impede o redimensionamento da janela
         self.root.configure(bg=WINDOW_BG_COLOR)
 
         # Handle window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        self.current_page = 0
 
         # Frame superior com botões de filtro
         self.filter_frame = tk.Frame(self.root, bg=WINDOW_BG_COLOR)
@@ -109,6 +80,13 @@ class PaymentApp:
         self.button_refresh = tk.Button(self.bottom_frame, text="Atualizar Lista", command=self.refresh_data, font=FONT, bg=REFRESH_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_refresh.grid(row=0, column=2, padx=PADX, pady=PADY)
 
+        # Botões de navegação de página
+        self.button_prev_page = tk.Button(self.bottom_frame, text="Página Anterior", command=self.prev_page, font=FONT, bg=BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_prev_page.grid(row=0, column=3, padx=PADX, pady=PADY)
+
+        self.button_next_page = tk.Button(self.bottom_frame, text="Próxima Página", command=self.next_page, font=FONT, bg=BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_next_page.grid(row=0, column=4, padx=PADX, pady=PADY)
+
         # Carregar dados na tabela de pagamentos
         self.load_data()
         self.sort_order = {}  # Dictionary to keep track of sort order for each column
@@ -145,7 +123,12 @@ class PaymentApp:
         # Obter os dados dos pagamentos
         payments = supabase.table("payments").select("*").execute()
 
-        for payment in payments.data:
+        self.all_payments = payments.data
+        self.display_page(self.current_page)
+
+    def display_page(self, page):
+        """Exibir uma página específica de pagamentos na tabela"""
+        for payment in self.all_payments:
             # Obter os dados do cliente
             client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
             
@@ -209,17 +192,9 @@ class PaymentApp:
         client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
         payments = supabase.table("payments").select("*").eq("client_id", client_id).execute()
 
-        for row in self.table.get_children():
-            self.table.delete(row)
-
-        for payment in payments.data:
-            client = supabase.table("clients").select("name, phone").eq("id", payment['client_id']).execute().data[0]
-            is_paid = "Quitado" if payment['is_paid'] else "Pendente"
-            try:
-                due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d").strftime("%d/%m/%Y")
-            except ValueError:
-                due_date = "Data inválida"
-            self.table.insert("", "end", values=(payment['id'], client['name'], client['phone'], payment['amount'], due_date, is_paid))
+        self.all_payments = payments.data
+        self.current_page = 0
+        self.display_page(self.current_page)
 
     def toggle_paid(self):
         """Alternar a exibição de pagamentos quitados"""
@@ -259,14 +234,24 @@ class PaymentApp:
         else:
             messagebox.showinfo("Informação", "Nenhum pagamento pendente selecionado para cobrança.")
 
+    def prev_page(self):
+        """Exibir a página anterior"""
+        pass
+
+    def next_page(self):
+        """Exibir a próxima página"""
+        pass
+
 class ClientCRUD:
     def __init__(self, root, app):
         self.app = app
         self.top = tk.Toplevel(root)
         self.top.title("Gerenciar Clientes")
-        self.top.geometry("600x400")
-        self.top.resizable(False, False)
+        self.top.geometry(CLIENT_CRUD_WINDOW_SIZE)
+        self.top.resizable(*CLIENT_CRUD_WINDOW_RESIZABLE)
         self.top.configure(bg=WINDOW_BG_COLOR)
+
+        self.current_page = 0
 
         self.sort_order = {}  # Dictionary to keep track of sort order for each column
 
@@ -317,29 +302,36 @@ class ClientCRUD:
         self.client_table_frame.pack(fill='both', expand=True, padx=PADX, pady=PADY)
 
         self.client_table_canvas = tk.Canvas(self.client_table_frame)
-        self.client_table_canvas.grid(row=0, column=0)
+        self.client_table_canvas.grid(row=0, column=0, sticky='nsew')
 
         self.client_table = ttk.Treeview(self.client_table_canvas, columns=("ID", "Nome", "Telefone"), show="headings", selectmode="extended", style="mystyle.Treeview")
         self.client_table.heading("ID", text="ID", command=lambda: self.sort_table(self.client_table, "ID"))
         self.client_table.heading("Nome", text="Nome", command=lambda: self.sort_table(self.client_table, "Nome"))
         self.client_table.heading("Telefone", text="Telefone", command=lambda: self.sort_table(self.client_table, "Telefone"))
         
-        self.client_table.column("ID", width=50, anchor="center")
-        self.client_table.column("Nome", width=200, anchor="w")
-        self.client_table.column("Telefone", width=150, anchor="center")
+        self.client_table.column("ID", width=110, anchor="center")
+        self.client_table.column("Nome", width=350, anchor="w")
+        self.client_table.column("Telefone", width=300, anchor="center")
 
         self.client_table.grid(row=0, column=0, sticky='nsew')
 
         self.client_table_frame.grid_rowconfigure(0, weight=1)
         self.client_table_frame.grid_columnconfigure(0, weight=1)
 
-        self.client_table_scrollbar = ttk.Scrollbar(self.client_table_frame, orient="vertical", command=self.client_table_canvas.yview)
+        self.client_table_scrollbar = ttk.Scrollbar(self.client_table_frame, orient="vertical", command=self.client_table.yview)
         self.client_table_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.client_table_canvas.configure(yscrollcommand=self.client_table_scrollbar.set)
+        self.client_table.configure(yscrollcommand=self.client_table_scrollbar.set)
 
         self.client_table_canvas.create_window((0, 0), window=self.client_table, anchor="nw")
 
         self.client_table.bind('<<TreeviewSelect>>', self.on_select)
+
+        # Botões de navegação de página
+        self.button_prev_page = tk.Button(self.top, text="Página Anterior", command=self.prev_page, font=FONT, bg=BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_prev_page.pack(side=tk.LEFT, padx=PADX, pady=PADY)
+
+        self.button_next_page = tk.Button(self.top, text="Próxima Página", command=self.next_page, font=FONT, bg=BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_next_page.pack(side=tk.RIGHT, padx=PADX, pady=PADY)
 
         self.load_clients()
 
@@ -395,7 +387,12 @@ class ClientCRUD:
 
         clients = supabase.table("clients").select("*").execute()
 
-        for client in clients.data:
+        self.all_clients = clients.data
+        self.display_page(self.current_page)
+
+    def display_page(self, page):
+        """Exibir uma página específica de clientes na tabela"""
+        for client in self.all_clients:
             self.client_table.insert("", "end", values=(client['id'], client['name'], client['phone']))
 
     def add_client(self):
@@ -494,11 +491,17 @@ class ClientCRUD:
 
         clients = supabase.table("clients").select("*").ilike("name", f"%{client_name}%").execute()
 
-        for row in self.client_table.get_children():
-            self.client_table.delete(row)
+        self.all_clients = clients.data
+        self.current_page = 0
+        self.display_page(self.current_page)
 
-        for client in clients.data:
-            self.client_table.insert("", "end", values=(client['id'], client['name'], client['phone']))
+    def prev_page(self):
+        """Exibir a página anterior"""
+        pass
+
+    def next_page(self):
+        """Exibir a próxima página"""
+        pass
 
     def show_messagebox(self, title, message, icon=messagebox.ERROR):
         """Show a messagebox and keep the CRUD window in front"""
@@ -510,8 +513,10 @@ class PaymentCRUD:
         self.app = app
         self.top = tk.Toplevel(root)
         self.top.title("Gerenciar Pagamentos")
-        self.top.geometry("800x400")
-        self.top.resizable(False, False)
+        self.top.geometry(PAYMENT_CRUD_WINDOW_SIZE)
+        self.top.resizable(*PAYMENT_CRUD_WINDOW_RESIZABLE)
+
+        self.current_page = 0
 
         self.sort_order = {}  # Dictionary to keep track of sort order for each column
 
@@ -566,6 +571,14 @@ class PaymentCRUD:
         self.button_refresh = tk.Button(self.top, text="Atualizar Lista", command=self.load_payments, font=FONT, bg=FILTER_BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
         self.button_refresh.pack(pady=5)
 
+        # Botões de navegação de página
+        self.button_prev_page = tk.Button(self.top, text="Página Anterior", command=self.prev_page, font=FONT, bg=BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        self.button_next_page = tk.Button(self.top, text="Próxima Página", command=self.next_page, font=FONT, bg=BUTTON_BG_COLOR, fg=BUTTON_FG_COLOR)
+        
+        # Adicionar botões de navegação de página abaixo do botão de atualizar lista
+        self.button_prev_page.pack(side=tk.LEFT, padx=PADX, pady=PADY)
+        self.button_next_page.pack(side=tk.RIGHT, padx=PADX, pady=PADY)
+
         # Tabela de pagamentos
         self.payment_table_frame = tk.Frame(self.top)
         self.payment_table_frame.pack(fill='both', expand=True, padx=10, pady=10)
@@ -582,19 +595,19 @@ class PaymentCRUD:
 
         # Ajustar o tamanho das colunas para torná-las visíveis
         self.payment_table.column("ID", width=60, anchor="center")
-        self.payment_table.column("Cliente", width=250, anchor="w")
-        self.payment_table.column("Valor", width=150, anchor="center")
+        self.payment_table.column("Cliente", width=200, anchor="w")
+        self.payment_table.column("Valor", width=160, anchor="center")
         self.payment_table.column("Data de Vencimento", width=150, anchor="center")
-        self.payment_table.column("Status", width=150, anchor="center")
+        self.payment_table.column("Status", width=100, anchor="center")
 
         self.payment_table.grid(row=0, column=0, sticky='nsew')
 
         self.payment_table_frame.grid_rowconfigure(0, weight=1)
         self.payment_table_frame.grid_columnconfigure(0, weight=1)
 
-        self.payment_table_scrollbar = ttk.Scrollbar(self.payment_table_frame, orient="vertical", command=self.payment_table_canvas.yview)
+        self.payment_table_scrollbar = ttk.Scrollbar(self.payment_table_frame, orient="vertical", command=self.payment_table.yview)
         self.payment_table_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.payment_table_canvas.configure(yscrollcommand=self.payment_table_scrollbar.set)
+        self.payment_table.configure(yscrollcommand=self.payment_table_scrollbar.set)
 
         self.payment_table_canvas.create_window((0, 0), window=self.payment_table, anchor="nw")
 
@@ -657,7 +670,12 @@ class PaymentCRUD:
 
         payments = supabase.table("payments").select("*").execute()
 
-        for payment in payments.data:
+        self.all_payments = payments.data
+        self.display_page(self.current_page)
+
+    def display_page(self, page):
+        """Exibir uma página específica de pagamentos na tabela"""
+        for payment in self.all_payments:
             client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
             status = "Quitado" if payment['is_paid'] else "Pendente"
             
@@ -815,17 +833,9 @@ class PaymentCRUD:
         client_id = supabase.table("clients").select("id").eq("name", client_name).execute().data[0]['id']
         payments = supabase.table("payments").select("*").eq("client_id", client_id).execute()
 
-        for row in self.payment_table.get_children():
-            self.payment_table.delete(row)
-
-        for payment in payments.data:
-            client = supabase.table("clients").select("name").eq("id", payment['client_id']).execute().data[0]
-            status = "Quitado" if payment['is_paid'] else "Pendente"
-            try:
-                due_date = datetime.strptime(payment['due_date'], "%Y-%m-%d").strftime("%d/%m/%Y")
-            except ValueError:
-                due_date = "Data inválida"
-            self.payment_table.insert("", "end", values=(payment['id'], client['name'], payment['amount'], due_date, status))
+        self.all_payments = payments.data
+        self.current_page = 0
+        self.display_page(self.current_page)
 
     def toggle_paid(self):
         """Alternar a exibição de pagamentos quitados"""
@@ -835,6 +845,14 @@ class PaymentCRUD:
         else:
             self.button_toggle_paid.config(text="Mostrar Pagamentos Quitados")
         self.load_payments()
+
+    def prev_page(self):
+        """Exibir a página anterior"""
+        pass
+
+    def next_page(self):
+        """Exibir a próxima página"""
+        pass
 
     def show_messagebox(self, title, message, icon=messagebox.ERROR):
         """Show a messagebox and keep the CRUD window in front"""
